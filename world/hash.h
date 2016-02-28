@@ -27,6 +27,6 @@ namespace world {
 
 using hash_t = uint32_t;
 
-hash_t Hash(const void* data, size_t size) noexcept;
+hash_t Hash(const void* key, size_t size) noexcept;
 
 } // namespace world

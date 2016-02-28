@@ -22,28 +22,40 @@
 
 namespace world {
 
-hash_t Hash(const void* data, size_t size) noexcept
+hash_t Hash(const void* key, size_t size) noexcept
 {
-  // TODO
+  // We employ MurmurHash1.
+  // https://github.com/aappleby/smhasher/blob/master/src/MurmurHash1.cpp
 
-  const hash_t P = 0xaaaaaa97;
-  const hash_t A = 0x9e3779b9;
+  const hash_t m = 0xc6a4a793;
 
-  hash_t hash = 0;
+  hash_t h = size * m;
+
   while (size >= sizeof(hash_t)) {
-    hash ^= *static_cast<const hash_t*>(data);
-    hash *= P;
-    data = static_cast<const void*>(static_cast<const hash_t*>(data) + 1);
+    h += static_cast<const hash_t*>(key)[0];
+    h *= m;
+    h ^= h >> 16;
+    key = static_cast<const void*>(static_cast<const hash_t*>(key) + 1);
     size -= sizeof(hash_t);
   }
-  while (size > 0) {
-    hash ^= *static_cast<const uint8_t*>(data);
-    hash *= P;
-    data = static_cast<const void*>(static_cast<const uint8_t*>(data) + 1);
-    size -= sizeof(uint8_t);
+
+  switch (size) {
+  case 3:
+    h += static_cast<const uint8_t*>(key)[2] << 16;
+  case 2:
+    h += static_cast<const uint8_t*>(key)[1] << 8;
+  case 1:
+    h += static_cast<const uint8_t*>(key)[0];
+    h *= m;
+    h ^= h >> 16;
   }
 
-  return hash * A;
+  h *= m;
+  h ^= h >> 10;
+  h *= m;
+  h ^= h >> 17;
+
+  return h;
 }
 
 } // namespace world
