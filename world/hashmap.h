@@ -21,15 +21,20 @@
 #pragma once
 
 #include <cmath>
+#include <deque>
 #include <shared_mutex>
 #include <vector>
+#include <world/snapshot.h>
 #include "world/hash.h"
-#include "world/snapshot_set.h"
 
 namespace world {
 
 class HashMap {
 public:
+  class Snapshot;
+  class SnapshotIterator;
+  struct SnapshotEntry;
+
   HashMap();
   HashMap(const HashMap&) = delete;
   HashMap(HashMap&&) = default;
@@ -38,7 +43,10 @@ public:
   HashMap& operator=(HashMap&&) = default;
 
   sequence_t SequenceNumber() const;
-  Snapshot* TakeSnapshot();
+  sequence_t CheckpointSequenceNumber() const;
+
+  Snapshot TakeSnapshot(sequence_t sequence) const;
+  SnapshotEntry Log(sequence_t sequence) const;
 
   bool Get(const void* key, size_t key_size,
            const void*& data, size_t& data_size) const;
@@ -54,24 +62,21 @@ public:
                const void* data, size_t data_size);
   bool Delete(const void* key, size_t key_size);
 
-  size_t EntrySize() const;
-  size_t BucketSize() const;
-  std::float_t LoadFactor() const;
-
-  void AddBucket();
+  void Checkpoint(sequence_t sequence);
   bool CollectGarbage();
 
 private:
+  static constexpr std::float_t LoadFactorThreshold = 0.9;
+
   mutable std::shared_timed_mutex mtx_;
 
-  sequence_t sequence_;
-  sequence_t n_entries_;
-
-  SnapshotSet snapshot_set_;
-
   struct Node;
+  std::deque<Node*> log_list_;
+  sequence_t checkpoint_sequence_;
+
   hash_t bucket_mask_;
   std::vector<Node*> bucket_list_;
+  sequence_t n_entries_;
 
   struct NodeMinHeapComparator;
   std::vector<Node*> garbage_heap_;
@@ -79,12 +84,72 @@ private:
   std::unique_lock<std::shared_timed_mutex> LockUnique();
   std::shared_lock<std::shared_timed_mutex> LockShared() const;
 
-  size_t BucketIndex(hash_t hash) const noexcept;
+  Node* MakeBucket(hash_t index);
+  Node* MakeVoid(hash_t hash, const void* key, size_t key_size);
+  Node* MakeEntry(hash_t hash, const void* key, size_t key_size,
+                  const void* data, size_t data_size);
 
+  size_t EntrySize() const;
+  size_t BucketSize() const;
+  std::float_t LoadFactor() const;
+
+  size_t BucketIndex(hash_t hash) const noexcept;
   bool Find(hash_t hash, const void* key, size_t key_size,
             Node*& cursor) noexcept;
 
+  void AddBucket();
   void MarkGarbage(Node* garbage);
 }; // class HashMap
+
+class HashMap::Snapshot {
+public:
+  Snapshot(const HashMap& hashmap, sequence_t sequence) noexcept;
+
+  sequence_t SequenceNumber() const noexcept;
+
+  bool Get(const void* key, size_t key_size,
+           const void*& data, size_t& data_size) const;
+
+  SnapshotIterator begin() const;
+  SnapshotIterator end() const;
+
+private:
+  const HashMap* hashmap_;
+  sequence_t sequence_;
+}; // class HashMap::Snapshot
+
+class HashMap::SnapshotIterator {
+public:
+  SnapshotIterator(const HashMap& hashmap,
+                   sequence_t sequence,
+                   const Node* cursor) noexcept;
+
+  SnapshotIterator& operator++() noexcept;
+  SnapshotIterator operator++(int) noexcept;
+  SnapshotEntry operator*() const noexcept;
+  operator bool() const noexcept;
+  bool operator==(const SnapshotIterator& rhs) const noexcept;
+  bool operator!=(const SnapshotIterator& rhs) const noexcept;
+
+private:
+  const HashMap* hashmap_;
+  sequence_t sequence_;
+  const Node* cursor_;
+
+  void AdjustCursor() noexcept;
+}; // class HashMap::SnapshotIterator
+
+struct HashMap::SnapshotEntry {
+  size_t key_size;
+  size_t data_size;
+  const void* key;
+  const void* data;
+
+  SnapshotEntry() noexcept;
+  SnapshotEntry(const void* key, size_t key_size,
+                const void* data, size_t data_size) noexcept;
+
+  operator bool() const noexcept;
+}; // struct HashMap::SnapshotEntry
 
 } // namespace world

@@ -20,33 +20,15 @@
 
 #pragma once
 
-#include <memory>
-#include <set>
-#include <mutex>
-#include <world/snapshot.h>
-
-namespace world {
-
-class HashMap;
-
-class SnapshotSet {
-public:
-  explicit SnapshotSet(std::shared_ptr<const HashMap> hashmap);
-
-  sequence_t LeastSequenceNumber() const;
-
-  world::Snapshot* TakeSnapshot();
-
-private:
-  class Snapshot;
-
-  std::shared_ptr<const HashMap> hashmap_;
-
-  mutable std::mutex mtx_;
-  std::multiset<sequence_t> sequence_set_;
-
-  std::unique_lock<std::mutex> Lock() const;
-}; // class SnapshotSet
-
-
-} // namespace world
+#if defined(WORLD_USE_POLL)
+#include "world/event_poll.h"
+namespace world { using EventDispatcher = EventDispatcherPoll; }
+#elif defined(WORLD_USE_KQUEUE)
+#include "world/event_kqueue.h"
+namespace world { using EventDispatcher = EventDispatcherKQueue; }
+#elif defined(WORLD_USE_EPOLL)
+#include "world/event_epoll.h"
+namespace world { using EventDispatcher = EventDispatcherEPoll; }
+#else
+#error "No event notification mechanism found"
+#endif

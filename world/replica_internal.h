@@ -20,10 +20,14 @@
 
 #pragma once
 
+#include <memory>
 #include <world/replica.h>
-#include "world/hashmap.h"
+#include "world/snapshot_set.h"
 
 namespace world {
+
+class HashMap;
+class ReplicaIOThread;
 
 class ReplicaInternal : public Replica {
 public:
@@ -32,13 +36,13 @@ public:
   const Snapshot* TakeSnapshot();
 
   bool Get(const void* key, size_t key_size,
-           const void*& data, size_t& data_size,
-           const Snapshot* snapshot = nullptr) const;
+           const void*& data, size_t& data_size) const;
 
 private:
-  ReplicaOption option_;
-
-  HashMap storage_;
+  std::shared_ptr<const ReplicaOption> option_;
+  std::shared_ptr<HashMap> hashmap_;
+  std::unique_ptr<ReplicaIOThread> io_thread_;
+  SnapshotSet snapshot_set_;
 }; // class ReplicaInternal
 
 } // namespace world

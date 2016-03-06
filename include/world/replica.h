@@ -21,15 +21,19 @@
 #pragma once
 
 #include <cstddef>
-#include <world/snapshot.h>
 
 namespace world {
 
 struct ReplicaOption {
-  int fd;
-
-  explicit ReplicaOption(int fd) noexcept;
+  // A file descriptor to be read. You must overwrite this member.
+  int fd = -1;
+  // Whether the file descriptor will be closed on destruct or not.
+  bool close_on_destruct = false;
+  // Whether the snapshot function is to be enabled or not.
+  bool enable_snapshot = false;
 }; // struct ReplicaOption
+
+class Snapshot;
 
 class Replica {
 public:
@@ -40,8 +44,7 @@ public:
   virtual const Snapshot* TakeSnapshot() = 0;
 
   virtual bool Get(const void* key, size_t key_size,
-                   const void*& data, size_t& data_size,
-                   const Snapshot* snapshot = nullptr) const = 0;
+                   const void*& data, size_t& data_size) const = 0;
 }; // class Replica
 
 } // namespace world

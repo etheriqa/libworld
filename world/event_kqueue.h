@@ -20,33 +20,25 @@
 
 #pragma once
 
-#include <memory>
-#include <set>
-#include <mutex>
-#include <world/snapshot.h>
+#include <functional>
 
 namespace world {
 
-class HashMap;
-
-class SnapshotSet {
+class EventDispatcherKQueue {
 public:
-  explicit SnapshotSet(std::shared_ptr<const HashMap> hashmap);
+  EventDispatcherKQueue();
 
-  sequence_t LeastSequenceNumber() const;
+  ~EventDispatcherKQueue() noexcept;
 
-  world::Snapshot* TakeSnapshot();
+  void Register(int fd, void* ctx);
+  void Unregister(int fd);
+
+  size_t Dispatch(std::function<void(void*)> callback, size_t timeout_ms);
 
 private:
-  class Snapshot;
+  static constexpr size_t EventBufferSize = 16; // TODO
 
-  std::shared_ptr<const HashMap> hashmap_;
-
-  mutable std::mutex mtx_;
-  std::multiset<sequence_t> sequence_set_;
-
-  std::unique_lock<std::mutex> Lock() const;
-}; // class SnapshotSet
-
+  int kq_;
+}; // class EventDispatcherKQueue
 
 } // namespace world

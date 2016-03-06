@@ -21,15 +21,21 @@
 #pragma once
 
 #include <cstddef>
-#include <world/snapshot.h>
 
 namespace world {
 
 struct OriginOption {
-  size_t n_io_threads;
-
-  OriginOption() noexcept;
+  // A number of the IO threads. It should be greater than or equal to 1.
+  size_t n_io_threads = 1;
+  // A maximum interval to wait for an event in milliseconds.
+  size_t event_timeout_ms = 100;
+  // An interval of doing the checkpoint process.
+  size_t checkpoint_interval = 1000;
+  // Whether the file descriptors will be closed on destruct or not.
+  bool close_on_destruct = false;
 }; // struct OriginOption
+
+class Snapshot;
 
 class Origin {
 public:
@@ -43,8 +49,7 @@ public:
   virtual const Snapshot* TakeSnapshot() = 0;
 
   virtual bool Get(const void* key, size_t key_size,
-                   const void*& data, size_t& data_size,
-                   const Snapshot* snapshot = nullptr) const = 0;
+                   const void*& data, size_t& data_size) const = 0;
 
   virtual bool Set(const void* key, size_t key_size,
                    const void* data, size_t data_size) = 0;

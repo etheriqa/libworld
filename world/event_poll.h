@@ -20,33 +20,26 @@
 
 #pragma once
 
-#include <memory>
-#include <set>
+#include <functional>
 #include <mutex>
-#include <world/snapshot.h>
+#include <unordered_map>
 
 namespace world {
 
-class HashMap;
-
-class SnapshotSet {
+class EventDispatcherPoll {
 public:
-  explicit SnapshotSet(std::shared_ptr<const HashMap> hashmap);
+  EventDispatcherPoll();
 
-  sequence_t LeastSequenceNumber() const;
+  void Register(int fd, void* ctx);
+  void Unregister(int fd);
 
-  world::Snapshot* TakeSnapshot();
+  size_t Dispatch(std::function<void(void*)> callback, size_t timeout_ms);
 
 private:
-  class Snapshot;
+  std::mutex mtx_;
+  std::unordered_map<int, void*> fd_table_;
 
-  std::shared_ptr<const HashMap> hashmap_;
-
-  mutable std::mutex mtx_;
-  std::multiset<sequence_t> sequence_set_;
-
-  std::unique_lock<std::mutex> Lock() const;
-}; // class SnapshotSet
-
+  std::unique_lock<std::mutex> Lock();
+}; // class EventDispatcherPoll
 
 } // namespace world

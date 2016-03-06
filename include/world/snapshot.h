@@ -30,7 +30,8 @@ class Snapshot {
 public:
   virtual ~Snapshot() noexcept {}
 
-  virtual sequence_t SequenceNumber() const noexcept = 0;
+  virtual bool Get(const void* key, size_t key_size,
+                   const void*& data, size_t& data_size) const = 0;
 }; // class snapshot
 
 } // namespace world

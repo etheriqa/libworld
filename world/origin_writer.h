@@ -21,32 +21,43 @@
 #pragma once
 
 #include <memory>
-#include <set>
-#include <mutex>
-#include <world/snapshot.h>
+#include <sys/uio.h>
+#include "world/hashmap.h"
 
 namespace world {
 
-class HashMap;
+struct OriginOption;
 
-class SnapshotSet {
+class OriginWriter {
 public:
-  explicit SnapshotSet(std::shared_ptr<const HashMap> hashmap);
+  OriginWriter(std::shared_ptr<const OriginOption> option,
+               std::shared_ptr<const HashMap> hashmap,
+               int fd);
 
-  sequence_t LeastSequenceNumber() const;
+  ~OriginWriter() noexcept;
 
-  world::Snapshot* TakeSnapshot();
+  int FD() const noexcept;
+  sequence_t SequenceNumber() const noexcept;
+  bool UpToDate() const noexcept;
+
+  void Write();
 
 private:
-  class Snapshot;
+  static constexpr size_t IOVecSize = 4;
 
+  std::shared_ptr<const OriginOption> option_;
   std::shared_ptr<const HashMap> hashmap_;
 
-  mutable std::mutex mtx_;
-  std::multiset<sequence_t> sequence_set_;
+  int fd_;
 
-  std::unique_lock<std::mutex> Lock() const;
-}; // class SnapshotSet
+  sequence_t sequence_;
+  HashMap::SnapshotIterator iterator_;
 
+  struct iovec iov_list_[IOVecSize];
+  size_t iov_size_;
+
+  void FillIOVec(const HashMap::SnapshotEntry& entry) noexcept;
+  void DrainIOVec(size_t n_written) noexcept;
+}; // class OriginWriter
 
 } // namespace world

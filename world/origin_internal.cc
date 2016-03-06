@@ -18,13 +18,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include "world/hashmap.h"
 #include "world/origin_internal.h"
+#include "world/origin_io_thread.h"
 
 namespace world {
-
-OriginOption::OriginOption() noexcept
-: n_io_threads(1)
-{}
 
 Origin* Origin::Open(const OriginOption& option)
 {
@@ -32,82 +30,101 @@ Origin* Origin::Open(const OriginOption& option)
 }
 
 OriginInternal::OriginInternal(const OriginOption& option)
-: option_(option)
-, storage_()
+: option_(std::make_shared<OriginOption>(option))
+, hashmap_(std::make_shared<HashMap>())
+, io_thread_list_{}
+, snapshot_set_(hashmap_)
 {
-  // TODO
+  for (size_t i = 0; i < option_->n_io_threads; i++) {
+    io_thread_list_.emplace_back(
+      std::make_unique<OriginIOThread>(option_, hashmap_));
+  }
 }
 
 bool OriginInternal::AddReplica(int fd)
 {
-  // TODO
+  io_thread_list_[fd % io_thread_list_.size()]->Register(fd);
   return true;
 }
 
 bool OriginInternal::RemoveReplica(int fd)
 {
-  // TODO
+  io_thread_list_[fd % io_thread_list_.size()]->Unregister(fd);
   return true;
 }
 
 const Snapshot* OriginInternal::TakeSnapshot()
 {
-  return storage_.TakeSnapshot();
+  return snapshot_set_.TakeSnapshot();
 }
 
 bool OriginInternal::Get(const void* key, size_t key_size,
-                         const void*& data, size_t& data_size,
-                         const Snapshot* snapshot) const
+                         const void*& data, size_t& data_size) const
 {
-  if (snapshot) {
-    return storage_.Get(key, key_size, data, data_size,
-                        snapshot->SequenceNumber());
-  } else {
-    return storage_.Get(key, key_size, data, data_size);
-  }
+  return hashmap_->Get(key, key_size, data, data_size);
 }
 
 bool OriginInternal::Set(const void* key, size_t key_size,
                          const void* data, size_t data_size)
 {
-  if (!storage_.Set(key, key_size, data, data_size)) {
+  if (!hashmap_->Set(key, key_size, data, data_size)) {
     return false;
   }
-
-  // TODO replicate
+  NotifyIOThreads();
+  Checkpoint();
   return true;
 }
 
 bool OriginInternal::Add(const void* key, size_t key_size,
                          const void* data, size_t data_size)
 {
-  if (!storage_.Add(key, key_size, data, data_size)) {
+  if (!hashmap_->Add(key, key_size, data, data_size)) {
     return false;
   }
-
-  // TODO replicate
+  NotifyIOThreads();
+  Checkpoint();
   return true;
 }
 
 bool OriginInternal::Replace(const void* key, size_t key_size,
                              const void* data, size_t data_size)
 {
-  if (!storage_.Replace(key, key_size, data, data_size)) {
+  if (!hashmap_->Replace(key, key_size, data, data_size)) {
     return false;
   }
-
-  // TODO replicate
+  NotifyIOThreads();
+  Checkpoint();
   return true;
 }
 
 bool OriginInternal::Delete(const void* key, size_t key_size)
 {
-  if (!storage_.Delete(key, key_size)) {
+  if (!hashmap_->Delete(key, key_size)) {
     return false;
   }
-
-  // TODO replicate
+  NotifyIOThreads();
+  Checkpoint();
   return true;
+}
+
+void OriginInternal::NotifyIOThreads()
+{
+  for (const auto& io_thread : io_thread_list_) {
+    io_thread->Notify();
+  }
+}
+
+void OriginInternal::Checkpoint()
+{
+  sequence_t sequence = hashmap_->SequenceNumber();
+  if (hashmap_->SequenceNumber() % option_->checkpoint_interval > 0) {
+    return;
+  }
+  for (const auto& io_thread : io_thread_list_) {
+    sequence = std::min(sequence, io_thread->LeastSequenceNumber());
+  }
+  sequence = std::min(sequence, snapshot_set_.LeastSequenceNumber());
+  hashmap_->Checkpoint(sequence);
 }
 
 } // namespace world

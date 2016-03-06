@@ -20,103 +20,70 @@
 
 #include <cassert>
 #include "world/snapshot_set.h"
+#include "world/hashmap.h"
 
 namespace world {
 
-struct SnapshotSet::Node : public Snapshot {
-  std::recursive_mutex& mtx;
-  const sequence_t sequence;
-  Node* prev;
-  Node* next;
+class SnapshotSet::Snapshot : public world::Snapshot {
+public:
+  Snapshot(SnapshotSet& snapshot_set, const HashMap::Snapshot& snapshot);
 
-  Node(std::recursive_mutex& mtx) noexcept;
-  Node(std::recursive_mutex& mtx, sequence_t sequence,
-       Node* prev, Node* next) noexcept;
-  Node(const Node&) = delete;
-  Node(Node&&) = delete;
+  ~Snapshot() noexcept;
 
-  ~Node() noexcept;
+  bool Get(const void* key, size_t key_size,
+           const void*& data, size_t& data_size) const;
 
-  Node& operator=(const Node&) = delete;
-  Node& operator=(Node&&) = delete;
+private:
+  SnapshotSet& snapshot_set_;
+  HashMap::Snapshot snapshot_;
+}; // class SnapshotSet::Sequence
 
-  sequence_t SequenceNumber() const noexcept;
-}; // struct SnapshotSet::Node
-
-SnapshotSet::SnapshotSet()
-: mtx_(new std::recursive_mutex)
-, sentinel_(new Node(*mtx_))
+SnapshotSet::SnapshotSet(std::shared_ptr<const HashMap> hashmap)
+: hashmap_(std::move(hashmap))
+, mtx_()
+, sequence_set_{}
 {}
 
-SnapshotSet::~SnapshotSet() noexcept
-{
-  assert(sentinel_->prev == sentinel_);
-  assert(sentinel_->next == sentinel_);
-  delete sentinel_;
-  delete mtx_;
-}
-
-bool SnapshotSet::LeastSequenceNumber(sequence_t& sequence) const
+sequence_t SnapshotSet::LeastSequenceNumber() const
 {
   auto lock = Lock();
-  if (sentinel_->next == sentinel_) {
-    return false;
+  if (sequence_set_.empty()) {
+    return hashmap_->SequenceNumber();
+  } else {
+    return *sequence_set_.begin();
   }
-  sequence = sentinel_->next->sequence;
-  return true;
 }
 
-bool SnapshotSet::GreatestSequenceNumber(sequence_t& sequence) const
+world::Snapshot* SnapshotSet::TakeSnapshot()
 {
   auto lock = Lock();
-  if (sentinel_->prev == sentinel_) {
-    return false;
-  }
-  sequence = sentinel_->prev->sequence;
-  return true;
+  const auto sequence = hashmap_->SequenceNumber();
+  sequence_set_.emplace(sequence);
+  return new SnapshotSet::Snapshot(*this, hashmap_->TakeSnapshot(sequence));
 }
 
-Snapshot* SnapshotSet::TakeSnapshot(sequence_t sequence)
+std::unique_lock<std::mutex> SnapshotSet::Lock() const
 {
-  auto lock = Lock();
-  auto node = new Node(*mtx_, sequence, sentinel_->prev, sentinel_);
-  assert(node->prev->sequence <= sequence);
-  node->prev->next = node;
-  node->next->prev = node;
-  return node;
+  return std::unique_lock<std::mutex>(mtx_);
 }
 
-std::unique_lock<std::recursive_mutex> SnapshotSet::Lock() const
-{
-  return std::unique_lock<std::recursive_mutex>(*mtx_);
-}
-
-SnapshotSet::Node::Node(std::recursive_mutex& mtx) noexcept
-: mtx(mtx)
-, sequence(0)
-, prev(this)
-, next(this)
+SnapshotSet::Snapshot::Snapshot(SnapshotSet& snapshot_set,
+                                const HashMap::Snapshot& snapshot)
+: snapshot_set_(snapshot_set)
+, snapshot_(snapshot)
 {}
 
-SnapshotSet::Node::Node(std::recursive_mutex& mtx, sequence_t sequence,
-                        Node* prev, Node* next) noexcept
-: mtx(mtx)
-, sequence(sequence)
-, prev(prev)
-, next(next)
-{}
-
-SnapshotSet::Node::~Node() noexcept
+SnapshotSet::Snapshot::~Snapshot() noexcept
 {
-  // XXX it may throw an exception
-  std::unique_lock<std::recursive_mutex> lock(mtx);
-  prev->next = next;
-  next->prev = prev;
+  auto lock = snapshot_set_.Lock();
+  auto& sequence_set = snapshot_set_.sequence_set_;
+  sequence_set.erase(sequence_set.find(snapshot_.SequenceNumber()));
 }
 
-sequence_t SnapshotSet::Node::SequenceNumber() const noexcept
+bool SnapshotSet::Snapshot::Get(const void* key, size_t key_size,
+                                const void*& data, size_t& data_size) const
 {
-  return sequence;
+  return snapshot_.Get(key, key_size, data, data_size);
 }
 
 } // namespace world

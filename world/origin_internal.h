@@ -20,10 +20,15 @@
 
 #pragma once
 
+#include <memory>
+#include <vector>
 #include <world/origin.h>
-#include "world/hashmap.h"
+#include "world/snapshot_set.h"
 
 namespace world {
+
+class HashMap;
+class OriginIOThread;
 
 class OriginInternal : public Origin {
 public:
@@ -35,8 +40,7 @@ public:
   const Snapshot* TakeSnapshot();
 
   bool Get(const void* key, size_t key_size,
-           const void*& data, size_t& data_size,
-           const Snapshot* snapshot = nullptr) const;
+           const void*& data, size_t& data_size) const;
 
   bool Set(const void* key, size_t key_size,
            const void* data, size_t data_size);
@@ -47,9 +51,13 @@ public:
   bool Delete(const void* key, size_t key_size);
 
 private:
-  OriginOption option_;
+  std::shared_ptr<const OriginOption> option_;
+  std::shared_ptr<HashMap> hashmap_;
+  std::vector<std::unique_ptr<OriginIOThread>> io_thread_list_;
+  SnapshotSet snapshot_set_;
 
-  HashMap storage_;
+  void NotifyIOThreads();
+  void Checkpoint();
 }; // class OriginInternal
 
 } // namespace world

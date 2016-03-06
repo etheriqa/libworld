@@ -18,15 +18,56 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <world/origin.h>
-#include "world/test.h"
+#pragma once
 
-using namespace world;
+#include <atomic>
+#include <memory>
+#include <mutex>
+#include <thread>
+#include <unordered_map>
+#include <vector>
+#include <world/snapshot.h>
+#include "world/event.h"
 
-int main()
-{
-  // TODO WIP
-  auto origin = Origin::Open(OriginOption());
-  delete origin;
-  return STATUS;
-}
+namespace world {
+
+struct OriginOption;
+class HashMap;
+class OriginWriter;
+
+class OriginIOThread {
+public:
+  OriginIOThread(std::shared_ptr<const OriginOption> option,
+                 std::shared_ptr<const HashMap> hashmap);
+
+  ~OriginIOThread() noexcept;
+
+  void Register(int fd);
+  void Unregister(int fd);
+
+  void Notify();
+
+  sequence_t LeastSequenceNumber() const;
+
+private:
+  std::shared_ptr<const OriginOption> option_;
+  std::shared_ptr<const HashMap> hashmap_;
+
+  mutable std::mutex mtx_;
+  std::unordered_map<int, std::unique_ptr<OriginWriter>> writer_table_;
+  std::vector<int> disabled_fd_list_;
+  EventDispatcher dispatcher_;
+
+  std::atomic<bool> loop_condition_;
+  std::thread thread_;
+
+  std::unique_lock<std::mutex> Lock() const;
+
+  void EventLoop();
+  void HandleEvent(OriginWriter& writer);
+
+  void EnableAll();
+  void Disable(int fd);
+}; // class OriginIOThread
+
+} // namespace world

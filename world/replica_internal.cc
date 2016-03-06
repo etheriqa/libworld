@@ -18,13 +18,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include "world/hashmap.h"
 #include "world/replica_internal.h"
+#include "world/replica_io_thread.h"
 
 namespace world {
-
-ReplicaOption::ReplicaOption(int fd) noexcept
-: fd(fd)
-{}
 
 Replica* Replica::Open(const ReplicaOption& option)
 {
@@ -32,27 +30,21 @@ Replica* Replica::Open(const ReplicaOption& option)
 }
 
 ReplicaInternal::ReplicaInternal(const ReplicaOption& option)
-: option_(option)
-, storage_()
-{
-  // TODO
-}
+: option_(std::make_shared<ReplicaOption>(option))
+, hashmap_(std::make_shared<HashMap>())
+, io_thread_(std::make_unique<ReplicaIOThread>(option_, hashmap_))
+, snapshot_set_(hashmap_)
+{}
 
 const Snapshot* ReplicaInternal::TakeSnapshot()
 {
-  return storage_.TakeSnapshot();
+  return snapshot_set_.TakeSnapshot();
 }
 
 bool ReplicaInternal::Get(const void* key, size_t key_size,
-                          const void*& data, size_t& data_size,
-                          const Snapshot* snapshot) const
+                          const void*& data, size_t& data_size) const
 {
-  if (snapshot) {
-    return storage_.Get(key, key_size, data, data_size,
-                        snapshot->SequenceNumber());
-  } else {
-    return storage_.Get(key, key_size, data, data_size);
-  }
+  return hashmap_->Get(key, key_size, data, data_size);
 }
 
 } // namespace world

@@ -18,15 +18,32 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <world/replica.h>
-#include "world/test.h"
+#pragma once
 
-using namespace world;
+#include <atomic>
+#include <memory>
+#include <thread>
 
-int main()
-{
-  // TODO WIP
-  auto replica = Replica::Open(ReplicaOption(0));
-  delete replica;
-  return STATUS;
-}
+namespace world {
+
+struct ReplicaOption;
+class HashMap;
+
+class ReplicaIOThread {
+public:
+  ReplicaIOThread(std::shared_ptr<const ReplicaOption> option,
+                  std::shared_ptr<HashMap> hashmap);
+
+  ~ReplicaIOThread() noexcept;
+
+private:
+  std::shared_ptr<const ReplicaOption> option_;
+  std::shared_ptr<HashMap> hashmap_;
+
+  std::atomic<bool> loop_condition_;
+  std::thread thread_;
+
+  void EventLoop();
+}; // class ReplicaIOThread
+
+} // namespace world

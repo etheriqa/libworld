@@ -27,7 +27,7 @@
 
 using namespace world;
 
-void TestManipulation()
+void TestSimpleManipulation()
 {
   HashMap hashmap;
 
@@ -52,6 +52,8 @@ void TestManipulation()
     EXPECT(memcmp(found, data0, found_size) == 0);
 
     EXPECT_FALSE(hashmap.CollectGarbage());
+    hashmap.Checkpoint(hashmap.SequenceNumber());
+    EXPECT_FALSE(hashmap.CollectGarbage());
   }
 
   // Replace with data0.
@@ -67,8 +69,10 @@ void TestManipulation()
 
     EXPECT_TRUE(hashmap.CollectGarbage()); // seq = 1
     EXPECT_FALSE(hashmap.CollectGarbage());
+    hashmap.Checkpoint(hashmap.SequenceNumber());
+    EXPECT_FALSE(hashmap.CollectGarbage());
 
-    // Garbage collection causes no side effect externally.
+    // Checkpoint and garbage collection causes no side effect externally.
     EXPECT_TRUE(hashmap.Get(key, sizeof(key), found, found_size));
     EXPECT(found_size == sizeof(data0));
     EXPECT(memcmp(found, data0, found_size) == 0);
@@ -90,6 +94,8 @@ void TestManipulation()
 
     EXPECT_TRUE(hashmap.CollectGarbage()); // seq = 2
     EXPECT_FALSE(hashmap.CollectGarbage());
+    hashmap.Checkpoint(hashmap.SequenceNumber());
+    EXPECT_FALSE(hashmap.CollectGarbage());
 
     EXPECT_TRUE(hashmap.Get(key, sizeof(key), found, found_size));
     EXPECT(found_size == sizeof(data1));
@@ -107,6 +113,8 @@ void TestManipulation()
     EXPECT_FALSE(hashmap.Delete(key, sizeof(key)));
 
     EXPECT_TRUE(hashmap.CollectGarbage()); // seq = 3
+    EXPECT_FALSE(hashmap.CollectGarbage());
+    hashmap.Checkpoint(hashmap.SequenceNumber());
     EXPECT_TRUE(hashmap.CollectGarbage()); // seq = 4
     EXPECT_FALSE(hashmap.CollectGarbage());
 
@@ -116,7 +124,7 @@ void TestManipulation()
   }
 }
 
-void TestRandomSet()
+void TestRandomManipulation()
 {
   using key_t = uint16_t;
   using data_t = uint64_t;
@@ -157,22 +165,38 @@ void TestRandomSet()
       hashmap.Delete(&key, sizeof(key_t));
       break;
     }
+    hashmap.Checkpoint(hashmap.SequenceNumber());
     while (hashmap.CollectGarbage()) {}
-    while (hashmap.LoadFactor() > 0.9) { hashmap.AddBucket(); }
   }
 
-  for (const auto& kv : reference) {
-    const void* found;
-    size_t found_size;
-    ASSERT_TRUE(hashmap.Get(&kv.first, sizeof(key_t), found, found_size));
-    ASSERT(found_size == sizeof(data_t));
-    ASSERT(*static_cast<const data_t*>(found) == kv.second);
+  {
+    for (const auto& kv : reference) {
+      const void* found;
+      size_t found_size;
+      ASSERT_TRUE(hashmap.Get(&kv.first, sizeof(key_t), found, found_size));
+      ASSERT(found_size == sizeof(data_t));
+      ASSERT(*static_cast<const data_t*>(found) == kv.second);
+    }
+  }
+
+  {
+    size_t counter = 0;
+    for (const auto& entry : hashmap.TakeSnapshot(hashmap.SequenceNumber())) {
+      counter++;
+      ASSERT(entry.key_size == sizeof(key_t));
+      ASSERT(entry.data_size == sizeof(data_t));
+      const auto key = *static_cast<const key_t*>(entry.key);
+      const auto data = *static_cast<const data_t*>(entry.data);
+      ASSERT(reference.count(key) == 1);
+      ASSERT(reference[key] == data);
+    }
+    ASSERT(counter == reference.size());
   }
 }
 
 int main()
 {
-  TestManipulation();
-  TestRandomSet();
+  TestSimpleManipulation();
+  TestRandomManipulation();
   return STATUS;
 }
