@@ -83,5 +83,5 @@ target_link_libraries(unit_hashtable world)
 add_test(NAME unit/hashtable COMMAND unit_hashtable)
 
 add_executable(e2e_world test/e2e/world.c)
-target_link_libraries(e2e_world world Threads::Threads)
+target_link_libraries(e2e_world world ${CMAKE_THREAD_LIBS_INIT})
 add_test(NAME e2e/world COMMAND e2e_world)

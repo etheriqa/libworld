@@ -34,24 +34,24 @@ static inline uintmax_t decode_data_size(world_data_size data_size);
 
 static inline uintmax_t encode_key_size(world_key_size key_size)
 {
-  static_assert(sizeof(world_key_size) == sizeof(uint16_t), "world_key_size is uint16_t");
+  _Static_assert(sizeof(world_key_size) == sizeof(uint16_t), "world_key_size is uint16_t");
   return htons(key_size);
 }
 
 static inline uintmax_t decode_key_size(world_key_size key_size)
 {
-  static_assert(sizeof(world_key_size) == sizeof(uint16_t), "world_key_size is uint16_t");
+  _Static_assert(sizeof(world_key_size) == sizeof(uint16_t), "world_key_size is uint16_t");
   return ntohs(key_size);
 }
 
 static inline uintmax_t encode_data_size(world_data_size data_size)
 {
-  static_assert(sizeof(world_data_size) == sizeof(uint16_t), "world_data_size is uint16_t");
+  _Static_assert(sizeof(world_data_size) == sizeof(uint16_t), "world_data_size is uint16_t");
   return htons(data_size);
 }
 
 static inline uintmax_t decode_data_size(world_data_size data_size)
 {
-  static_assert(sizeof(world_data_size) == sizeof(uint16_t), "world_data_size is uint16_t");
+  _Static_assert(sizeof(world_data_size) == sizeof(uint16_t), "world_data_size is uint16_t");
   return ntohs(data_size);
 }

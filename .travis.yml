@@ -1,0 +1,16 @@
+language: c
+compiler:
+  - gcc-5
+  - clang-3.7
+addons:
+  apt:
+    sources:
+      - llvm-toolchain-precise-3.7
+      - ubuntu-toolchain-r-test
+    packages:
+      - gcc-5
+      - clang-3.7
+script:
+  - cmake . -DCMAKE_BUILD_TYPE=release -DCMAKE_VERBOSE_MAKEFILE=ON
+  - make
+  - make test
