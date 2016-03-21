@@ -20,63 +20,88 @@
  * SOFTWARE.
  */
 
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <world.h>
 #include "../helper.h"
 
+#if defined(WORLD_USE_SELECT) || defined(WORLD_USE_POLL)
+#define WORLD_TEST_E2E_N_REPLICAS 16
+#else
+#define WORLD_TEST_E2E_N_REPLICAS 1024
+#endif
+
 int main(void)
 {
-  int fds[2];
-  if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == -1) {
-    perror("socketpair");
+  struct rlimit rl;
+  if (getrlimit(RLIMIT_NOFILE, &rl) == -1) {
+    perror("getrlimit");
+    abort();
+  }
+  rl.rlim_cur = 3 * WORLD_TEST_E2E_N_REPLICAS + 16; // XXX see world_generate_hash()
+  if (setrlimit(RLIMIT_NOFILE, &rl) == -1) {
+    perror("setrlimit");
     abort();
   }
 
   struct world_originconf oc;
+  oc.n_io_threads = 4;
   world_originconf_init(&oc);
-
-  struct world_replicaconf rc;
-  world_replicaconf_init(&rc);
-  rc.fd = fds[0];
-
   struct world_origin *origin = world_origin_open(&oc);
-  struct world_replica *replica = world_replica_open(&rc);
 
-  struct world_iovec key, data, found;
+  struct world_iovec key, data;
   key.base = "foo";
   key.size = strlen(key.base) + 1;
   data.base = "Lorem ipsum";
   data.size = strlen(data.base) + 1;
 
-  ASSERT(world_origin_set(origin, key, data) == world_error_ok);
-  ASSERT(world_replica_get(replica, key, NULL) == world_error_no_such_key);
+  ASSERT(world_origin_add(origin, key, data) == world_error_ok);
 
-  ASSERT_TRUE(world_origin_attach(origin, fds[1]));
+  struct world_replica *replicas[WORLD_TEST_E2E_N_REPLICAS];
+  for (size_t i = 0; i < WORLD_TEST_E2E_N_REPLICAS; i++) {
+    int fds[2];
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == -1) {
+      perror("socketpair");
+      abort();
+    }
+
+    struct world_replicaconf rc;
+    world_replicaconf_init(&rc);
+    rc.fd = fds[0];
+    replicas[i] = world_replica_open(&rc);
+    world_origin_attach(origin, fds[1]);
+  }
 
   world_test_sleep_msec(100);
 
-  ASSERT(world_replica_get(replica, key, &found) == world_error_ok);
-  ASSERT(found.size == data.size);
-  ASSERT(memcmp(found.base, data.base, data.size) == 0);
+  for (size_t i = 0; i < WORLD_TEST_E2E_N_REPLICAS; i++) {
+    struct world_iovec found;
+    memset(&found, 0, sizeof(found));
+    ASSERT(world_replica_get(replicas[i], key, &found) == world_error_ok);
+    ASSERT(found.size == data.size);
+    ASSERT(memcmp(found.base, data.base, data.size) == 0);
+  }
 
   key.base = "bar";
   key.size = strlen(key.base) + 1;
   data.base = "dolor sit amet";
   data.size = strlen(data.base) + 1;
 
-  ASSERT(world_origin_set(origin, key, data) == world_error_ok);
+  ASSERT(world_origin_add(origin, key, data) == world_error_ok);
 
   world_test_sleep_msec(100);
 
-  ASSERT(world_replica_get(replica, key, &found) == world_error_ok);
-  ASSERT(found.size == data.size);
-  ASSERT(memcmp(found.base, data.base, data.size) == 0);
-
-  world_origin_close(origin);
-  world_replica_close(replica);
+  for (size_t i = 0; i < WORLD_TEST_E2E_N_REPLICAS; i++) {
+    struct world_iovec found;
+    memset(&found, 0, sizeof(found));
+    ASSERT(world_replica_get(replicas[i], key, &found) == world_error_ok);
+    ASSERT(found.size == data.size);
+    ASSERT(memcmp(found.base, data.base, data.size) == 0);
+  }
 
   return TEST_STATUS;
 }

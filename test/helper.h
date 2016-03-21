@@ -24,6 +24,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 static int TEST_STATUS = 0;
 
@@ -48,3 +49,11 @@ static int TEST_STATUS = 0;
 
 #define ASSERT_TRUE(expression) ASSERT(expression == true)
 #define ASSERT_FALSE(expression) ASSERT(expression == false)
+
+static inline void world_test_sleep_msec(size_t msec)
+{
+  struct timespec t;
+  t.tv_sec = 0;
+  t.tv_nsec = msec * 1000000;
+  nanosleep(&t, NULL);
+}

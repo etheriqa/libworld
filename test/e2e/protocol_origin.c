@@ -24,7 +24,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <unistd.h>
 #include <world.h>
+#include "../../src/world_byteorder.h"
 #include "../helper.h"
 
 int main(void)
@@ -38,45 +40,44 @@ int main(void)
   struct world_originconf oc;
   world_originconf_init(&oc);
 
-  struct world_replicaconf rc;
-  world_replicaconf_init(&rc);
-  rc.fd = fds[0];
-
   struct world_origin *origin = world_origin_open(&oc);
-  struct world_replica *replica = world_replica_open(&rc);
+  ASSERT_TRUE(world_origin_attach(origin, fds[1]));
 
-  struct world_iovec key, data, found;
+  struct world_iovec key, data;
   key.base = "foo";
   key.size = strlen(key.base) + 1;
   data.base = "Lorem ipsum";
   data.size = strlen(data.base) + 1;
-
-  ASSERT(world_origin_set(origin, key, data) == world_error_ok);
-  ASSERT(world_replica_get(replica, key, NULL) == world_error_no_such_key);
-
-  ASSERT_TRUE(world_origin_attach(origin, fds[1]));
-
-  world_test_sleep_msec(100);
-
-  ASSERT(world_replica_get(replica, key, &found) == world_error_ok);
-  ASSERT(found.size == data.size);
-  ASSERT(memcmp(found.base, data.base, data.size) == 0);
-
-  key.base = "bar";
-  key.size = strlen(key.base) + 1;
-  data.base = "dolor sit amet";
-  data.size = strlen(data.base) + 1;
-
   ASSERT(world_origin_set(origin, key, data) == world_error_ok);
 
   world_test_sleep_msec(100);
 
-  ASSERT(world_replica_get(replica, key, &found) == world_error_ok);
-  ASSERT(found.size == data.size);
-  ASSERT(memcmp(found.base, data.base, data.size) == 0);
+  uint8_t buf[4096];
+  ssize_t n_read = read(fds[0], buf, sizeof(buf));
+  if (n_read == -1) {
+    perror("read");
+    abort();
+  }
 
-  world_origin_close(origin);
-  world_replica_close(replica);
+
+  ASSERT(n_read == 20);
+
+  union {
+    world_key_size raw;
+    uint8_t buf[2];
+  } key_size;
+  memcpy(key_size.buf, buf, sizeof(key_size));
+  EXPECT(world_decode_key_size(key_size.raw) == key.size);
+
+  union {
+    world_data_size raw;
+    uint8_t buf[2];
+  } data_size;
+  memcpy(data_size.buf, &buf[2], sizeof(data_size));
+  EXPECT(world_decode_data_size(data_size.raw) == data.size);
+
+  EXPECT(memcmp(&buf[4], key.base, key.size) == 0);
+  EXPECT(memcmp(&buf[8], data.base, data.size) == 0);
 
   return TEST_STATUS;
 }

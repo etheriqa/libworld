@@ -49,8 +49,8 @@ static inline void circular_pop_back(struct circular *c);
 static inline void circular_push_front(struct circular *c, const void *element, size_t size);
 static inline void circular_pop_front(struct circular *c);
 
-static inline void circular__reserve_double(struct circular *c, size_t size);
-static inline void *circular__at(struct circular *c, size_t i, size_t size);
+static void circular__reserve_double(struct circular *c, size_t size);
+static void *circular__at(struct circular *c, size_t i, size_t size);
 
 static inline void circular_init(struct circular *c)
 {
@@ -160,14 +160,14 @@ static inline void circular_pop_front(struct circular *c)
   c->offset = (c->offset + 1) % c->capacity;
 }
 
-static inline void circular__reserve_double(struct circular *c, size_t size)
+static void circular__reserve_double(struct circular *c, size_t size)
 {
   assert(c);
   size_t capacity = c->capacity == 0 ? 1 : c->capacity * 2;
   circular_reserve(c, capacity, size);
 }
 
-static inline void *circular__at(struct circular *c, size_t i, size_t size)
+static void *circular__at(struct circular *c, size_t i, size_t size)
 {
   assert(c);
   assert(i < c->capacity);

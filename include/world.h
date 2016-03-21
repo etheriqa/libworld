@@ -22,38 +22,6 @@
 
 /**
  * API Overview
- *
- * struct world_originconf;
- * struct world_originconf_init(struct world_originconf *);
- *
- * struct world_origin *world_origin_open(const struct world_originconf *);
- * void                 world_origin_close(struct world_origin *);
- * bool                 world_origin_attach(struct world_origin *, int);
- * bool                 world_origin_detach(struct world_origin *, int);
- * bool                 world_origin_get(const struct world_origin *,
- *                                       struct world_iovec,
- *                                       struct world_iovec *);
- * bool                 world_origin_set(struct world_origin *,
- *                                       struct world_iovec,
- *                                       struct world_iovec);
- * bool                 world_origin_add(struct world_origin *,
- *                                       struct world_iovec,
- *                                       struct world_iovec);
- * bool                 world_origin_replace(struct world_origin *,
- *                                           struct world_iovec,
- *                                           struct world_iovec);
- * bool                 world_origin_delete(struct world_origin *,
- *                                          struct world_iovec,
- *                                          struct world_iovec);
- *
- * struct world_replicaconf;
- * struct world_replicaconf_init(struct world_replicaconf *);
- *
- * struct world_replica *world_replica_open(const struct world_replicaconf *);
- * void                  world_replica_close(struct world_replica *);
- * bool                  world_replica_get(const struct world_replica *,
- *                                         struct world_iovec,
- *                                         struct world_iovec *);
  */
 
 #pragma once
@@ -69,6 +37,16 @@ extern "C" {
 typedef uint64_t world_sequence;
 typedef uint16_t world_key_size;
 typedef uint16_t world_data_size;
+
+enum world_error {
+  world_error_ok               = 0,
+  world_error_invalid_argument = 1,
+  world_error_no_such_key      = 2,
+  world_error_key_exists       = 3,
+  world_error_system           = 4,
+  world_error_internal         = 5,
+  world_error_fatal            = 6,
+};
 
 /**
  * A structure represents a configuration for world_origin_open().
@@ -166,11 +144,11 @@ bool world_origin_attach(struct world_origin *origin, int fd);
  */
 bool world_origin_detach(struct world_origin *origin, int fd);
 
-bool world_origin_get(const struct world_origin *origin, struct world_iovec key, struct world_iovec *found);
-bool world_origin_set(struct world_origin *origin, struct world_iovec key, struct world_iovec data);
-bool world_origin_add(struct world_origin *origin, struct world_iovec key, struct world_iovec data);
-bool world_origin_replace(struct world_origin *origin, struct world_iovec key, struct world_iovec data);
-bool world_origin_delete(struct world_origin *origin, struct world_iovec key);
+enum world_error world_origin_get(const struct world_origin *origin, struct world_iovec key, struct world_iovec *found);
+enum world_error world_origin_set(struct world_origin *origin, struct world_iovec key, struct world_iovec data);
+enum world_error world_origin_add(struct world_origin *origin, struct world_iovec key, struct world_iovec data);
+enum world_error world_origin_replace(struct world_origin *origin, struct world_iovec key, struct world_iovec data);
+enum world_error world_origin_delete(struct world_origin *origin, struct world_iovec key);
 
 /**
  * A handle structure represents a replica ("slave").
@@ -194,10 +172,7 @@ struct world_replica *world_replica_open(const struct world_replicaconf *conf);
  */
 void world_replica_close(struct world_replica *replica);
 
-/**
- * @return TODO Not yet implemented.
- */
-bool world_replica_get(const struct world_replica *replica, struct world_iovec key, struct world_iovec *found);
+enum world_error world_replica_get(const struct world_replica *replica, struct world_iovec key, struct world_iovec *found);
 
 #if defined(__cplusplus)
 }

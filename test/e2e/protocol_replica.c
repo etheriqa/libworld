@@ -24,7 +24,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <unistd.h>
 #include <world.h>
+#include "../../src/world_byteorder.h"
 #include "../helper.h"
 
 int main(void)
@@ -35,48 +37,49 @@ int main(void)
     abort();
   }
 
-  struct world_originconf oc;
-  world_originconf_init(&oc);
-
   struct world_replicaconf rc;
   world_replicaconf_init(&rc);
   rc.fd = fds[0];
 
-  struct world_origin *origin = world_origin_open(&oc);
   struct world_replica *replica = world_replica_open(&rc);
 
-  struct world_iovec key, data, found;
+  struct world_iovec key, data;
   key.base = "foo";
   key.size = strlen(key.base) + 1;
   data.base = "Lorem ipsum";
   data.size = strlen(data.base) + 1;
 
-  ASSERT(world_origin_set(origin, key, data) == world_error_ok);
-  ASSERT(world_replica_get(replica, key, NULL) == world_error_no_such_key);
+  uint8_t buf[4096];
 
-  ASSERT_TRUE(world_origin_attach(origin, fds[1]));
+  union {
+    world_key_size raw;
+    uint8_t buf[2];
+  } key_size;
+  key_size.raw = world_encode_key_size(key.size);
+  memcpy(&buf[0], key_size.buf, sizeof(key_size));
+
+  union {
+    world_data_size raw;
+    uint8_t buf[2];
+  } data_size;
+  data_size.raw = world_encode_data_size(data.size);
+  memcpy(&buf[2], data_size.buf, sizeof(data_size));
+
+  memcpy(&buf[4], key.base, key.size);
+  memcpy(&buf[8], data.base, data.size);
+
+  ssize_t n_written = write(fds[1], buf, 20);
+  if (n_written == -1) {
+    perror("write");
+    abort();
+  }
 
   world_test_sleep_msec(100);
 
+  struct world_iovec found;
   ASSERT(world_replica_get(replica, key, &found) == world_error_ok);
   ASSERT(found.size == data.size);
   ASSERT(memcmp(found.base, data.base, data.size) == 0);
-
-  key.base = "bar";
-  key.size = strlen(key.base) + 1;
-  data.base = "dolor sit amet";
-  data.size = strlen(data.base) + 1;
-
-  ASSERT(world_origin_set(origin, key, data) == world_error_ok);
-
-  world_test_sleep_msec(100);
-
-  ASSERT(world_replica_get(replica, key, &found) == world_error_ok);
-  ASSERT(found.size == data.size);
-  ASSERT(memcmp(found.base, data.base, data.size) == 0);
-
-  world_origin_close(origin);
-  world_replica_close(replica);
 
   return TEST_STATUS;
 }

@@ -41,6 +41,7 @@ typedef bool (*vector_heap_property)(const void *, const void *);
 static inline void vector_init(struct vector *v);
 static inline void vector_destroy(struct vector *v);
 static inline size_t vector_size(struct vector *v);
+static inline void vector_resize(struct vector *v, size_t capacity, size_t size);
 static inline void vector_reserve(struct vector *v, size_t capacity, size_t size);
 static inline void *vector_at(struct vector *v, size_t i, size_t size);
 static inline void *vector_front(struct vector *v);
@@ -51,9 +52,9 @@ static inline void vector_pop_back(struct vector *v);
 static inline void vector_push_heap(struct vector *v, const void *element, size_t size, vector_heap_property property);
 static inline void vector_pop_heap(struct vector *v, size_t size, vector_heap_property property);
 
-static inline void vector__reserve_double(struct vector *v, size_t size);
-static inline void *vector__at(struct vector *v, size_t i, size_t size);
-static inline void vector__swap(struct vector *v, size_t i, size_t j, size_t size);
+static void vector__reserve_double(struct vector *v, size_t size);
+static void *vector__at(struct vector *v, size_t i, size_t size);
+static void vector__swap(struct vector *v, size_t i, size_t j, size_t size);
 
 static inline void vector_init(struct vector *v)
 {
@@ -75,6 +76,13 @@ static inline size_t vector_size(struct vector *v)
   return v->size;
 }
 
+static inline void vector_resize(struct vector *v, size_t n, size_t size)
+{
+  assert(v);
+  vector_reserve(v, n, size);
+  v->size = n;
+}
+
 static inline void vector_reserve(struct vector *v, size_t capacity, size_t size)
 {
   assert(v);
@@ -86,6 +94,7 @@ static inline void vector_reserve(struct vector *v, size_t capacity, size_t size
     perror("realloc");
     abort();
   }
+  memset((void *)((uintptr_t)v->base + v->size * size), 0, (capacity - v->size) * size);
   v->capacity = capacity;
 }
 
@@ -192,20 +201,20 @@ static inline void vector_pop_heap(struct vector *v, size_t size, vector_heap_pr
   }
 }
 
-static inline void vector__reserve_double(struct vector *v, size_t size)
+static void vector__reserve_double(struct vector *v, size_t size)
 {
   assert(v);
   size_t capacity = v->capacity == 0 ? 1 : v->capacity * 2;
   vector_reserve(v, capacity, size);
 }
 
-static inline void *vector__at(struct vector *v, size_t i, size_t size)
+static void *vector__at(struct vector *v, size_t i, size_t size)
 {
   assert(v);
   return (void *)((uintptr_t)v->base + i * size);
 }
 
-static inline void vector__swap(struct vector *v, size_t i, size_t j, size_t size)
+static void vector__swap(struct vector *v, size_t i, size_t j, size_t size)
 {
   assert(v);
   if (i == j) {

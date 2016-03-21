@@ -21,13 +21,13 @@
  */
 
 #include <string.h>
-#include "../../src/hashtable.h"
+#include "../../src/world_hashtable.h"
 #include "../helper.h"
 
 static void test_hashtable_manipulation(void)
 {
-  struct hashtable ht;
-  hashtable_init(&ht);
+  struct world_hashtable ht;
+  world_hashtable_init(&ht, 0);
 
   struct world_iovec key, data, found;
 
@@ -37,30 +37,30 @@ static void test_hashtable_manipulation(void)
   data.size = strlen(data.base) + 1;
 
   // ERROR: GET "foo"
-  ASSERT_FALSE(hashtable_get(&ht, key, &found, hashtable_get_sequence(&ht)));
+  ASSERT(world_hashtable_get(&ht, key, &found) == world_error_no_such_key);
 
   // ERROR: REPLACE "foo" "Lorem ipsum"
-  ASSERT_FALSE(hashtable_replace(&ht, key, data));
+  ASSERT(world_hashtable_replace(&ht, key, data) == world_error_no_such_key);
 
   // ERROR: DELETE "foo"
-  ASSERT_FALSE(hashtable_delete(&ht, key));
+  ASSERT(world_hashtable_delete(&ht, key) == world_error_no_such_key);
 
   // OK: ADD "foo" "Lorem ipsum"
-  ASSERT_TRUE(hashtable_add(&ht, key, data));
+  ASSERT(world_hashtable_add(&ht, key, data) == world_error_ok);
 
   // OK: GET "foo"
-  ASSERT_TRUE(hashtable_get(&ht, key, &found, hashtable_get_sequence(&ht)));
+  ASSERT(world_hashtable_get(&ht, key, &found) == world_error_ok);
   ASSERT(found.size == data.size);
   ASSERT(memcmp(found.base, data.base, data.size) == 0);
 
   // ERROR: ADD "foo" "Lorem ipsum"
-  ASSERT_FALSE(hashtable_add(&ht, key, data));
+  ASSERT(world_hashtable_add(&ht, key, data) == world_error_key_exists);
 
   // OK: REPLACE "foo" "Lorem ipsum"
-  ASSERT_TRUE(hashtable_replace(&ht, key, data));
+  ASSERT(world_hashtable_replace(&ht, key, data) == world_error_ok);
 
   // OK: GET "foo"
-  ASSERT_TRUE(hashtable_get(&ht, key, &found, hashtable_get_sequence(&ht)));
+  ASSERT(world_hashtable_get(&ht, key, &found) == world_error_ok);
   ASSERT(found.size == data.size);
   ASSERT(memcmp(found.base, data.base, data.size) == 0);
 
@@ -68,13 +68,13 @@ static void test_hashtable_manipulation(void)
   data.size = strlen(data.base) + 1;
 
   // ERROR: ADD "foo" "Lorem ipsum dolor sit amet"
-  ASSERT_FALSE(hashtable_add(&ht, key, data));
+  ASSERT(world_hashtable_add(&ht, key, data) == world_error_key_exists);
 
   // OK: REPLACE "foo" "Lorem ipsum dolor sit amet"
-  ASSERT_TRUE(hashtable_replace(&ht, key, data));
+  ASSERT(world_hashtable_replace(&ht, key, data) == world_error_ok);
 
   // OK: GET "foo"
-  ASSERT_TRUE(hashtable_get(&ht, key, &found, hashtable_get_sequence(&ht)));
+  ASSERT(world_hashtable_get(&ht, key, &found) == world_error_ok);
   ASSERT(found.size == data.size);
   ASSERT(memcmp(found.base, data.base, data.size) == 0);
 
@@ -84,10 +84,10 @@ static void test_hashtable_manipulation(void)
   data.size = strlen(data.base) + 1;
 
   // OK: SET "bar" "consectetur adipiscing el it"
-  ASSERT_TRUE(hashtable_set(&ht, key, data));
+  ASSERT(world_hashtable_set(&ht, key, data) == world_error_ok);
 
   // OK: GET "bar"
-  ASSERT_TRUE(hashtable_get(&ht, key, &found, hashtable_get_sequence(&ht)));
+  ASSERT(world_hashtable_get(&ht, key, &found) == world_error_ok);
   ASSERT(found.size == data.size);
   ASSERT(memcmp(found.base, data.base, data.size) == 0);
 
@@ -95,10 +95,10 @@ static void test_hashtable_manipulation(void)
   key.size = strlen(key.base) + 1;
 
   // OK: DELETE "foo"
-  ASSERT_TRUE(hashtable_delete(&ht, key));
+  ASSERT(world_hashtable_delete(&ht, key) == world_error_ok);
 
   // ERROR: GET "foo"
-  ASSERT_FALSE(hashtable_get(&ht, key, &found, hashtable_get_sequence(&ht)));
+  ASSERT(world_hashtable_get(&ht, key, &found) == world_error_no_such_key);
 
   key.base = "bar";
   key.size = strlen(key.base) + 1;
@@ -106,11 +106,11 @@ static void test_hashtable_manipulation(void)
   data.size = strlen(data.base) + 1;
 
   // OK: GET "bar"
-  ASSERT_TRUE(hashtable_get(&ht, key, &found, hashtable_get_sequence(&ht)));
+  ASSERT(world_hashtable_get(&ht, key, &found) == world_error_ok);
   ASSERT(found.size == data.size);
   ASSERT(memcmp(found.base, data.base, data.size) == 0);
 
-  hashtable_destroy(&ht);
+  world_hashtable_destroy(&ht);
 }
 
 int main(void)
