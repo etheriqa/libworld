@@ -50,8 +50,10 @@ size_t world_vector_size(struct world_vector *v)
 
 void world_vector_resize(struct world_vector *v, size_t capacity, size_t size)
 {
-  world_vector_reserve(v, capacity, size);
-  memset(_at(v, v->size, size), 0, (capacity - v->size) * size);
+  if (capacity > v->size) {
+    world_vector_reserve(v, capacity, size);
+    memset(_at(v, v->size, size), 0, (capacity - v->size) * size);
+  }
   v->size = capacity;
 }
 
