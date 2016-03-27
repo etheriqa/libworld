@@ -22,36 +22,8 @@
 
 #pragma once
 
-#include <pthread.h>
-#include <stdatomic.h>
-#include "world_circular.h"
-#include "world_io.h"
-#include "world_mutex.h"
-#include "world_vector.h"
+struct world_replica;
 
-struct world_origin;
-
-struct world_origin_iothread {
-  struct world_origin_iothread_dispatcher {
-    struct world_mutex mtx;
-    struct world_vector handlers;
-    struct world_io_multiplexer multiplexer;
-  } dispatcher;
-
-  struct world_circular updated;
-  struct world_circular disconnected;
-  struct world_circular asleep;
-
-  pthread_t thread;
-  atomic_bool thread_loop_condition;
-
-  struct world_origin *origin;
+struct worldaux_client {
+  struct world_replica *replica;
 };
-
-void world_origin_iothread_init(struct world_origin_iothread *ot, struct world_origin *origin);
-void world_origin_iothread_destroy(struct world_origin_iothread *ot);
-void world_origin_iothread_attach(struct world_origin_iothread *ot, int fd);
-void world_origin_iothread_detach(struct world_origin_iothread *ot, int fd);
-void world_origin_iothread_mark_updated(struct world_origin_iothread *ot, int fd);
-void world_origin_iothread_mark_disconnected(struct world_origin_iothread *ot, int fd);
-world_sequence world_origin_iothread_least_sequence(struct world_origin_iothread *ot);

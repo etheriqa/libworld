@@ -77,6 +77,10 @@ static void _write(struct world_io_handler *h)
     if (errno == EAGAIN) {
       return;
     }
+    if (errno == EPIPE) {
+      world_origin_iothread_mark_disconnected(oh->thread, oh->base.fd);
+      return;
+    }
     // TODO handle errors
     perror("writev");
     abort();

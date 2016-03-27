@@ -20,38 +20,36 @@
  * SOFTWARE.
  */
 
-#pragma once
+#include <string.h>
+#include <worldaux.h>
+#include "../helper.h"
 
-#include <pthread.h>
-#include <stdatomic.h>
-#include "world_circular.h"
-#include "world_io.h"
-#include "world_mutex.h"
-#include "world_vector.h"
+int main(void)
+{
+  struct worldaux_server *server;
+  ASSERT(worldaux_server_open(&server, "127.0.0.1", "25200") == world_error_ok);
 
-struct world_origin;
+  struct worldaux_client *client;
+  ASSERT(worldaux_client_open(&client, "127.0.0.1", "25200") == world_error_ok);
 
-struct world_origin_iothread {
-  struct world_origin_iothread_dispatcher {
-    struct world_mutex mtx;
-    struct world_vector handlers;
-    struct world_io_multiplexer multiplexer;
-  } dispatcher;
+  struct world_origin *origin = worldaux_server_get_origin(server);
+  struct world_iovec key, data;
+  key.base = "foo";
+  key.size = strlen(key.base) + 1;
+  data.base = "Lorem ipsum";
+  data.size = strlen(data.base) + 1;
+  ASSERT(world_origin_set(origin, key, data) == world_error_ok);
 
-  struct world_circular updated;
-  struct world_circular disconnected;
-  struct world_circular asleep;
+  world_test_sleep_msec(100);
 
-  pthread_t thread;
-  atomic_bool thread_loop_condition;
+  struct world_replica *replica = worldaux_client_get_replica(client);
+  struct world_iovec found;
+  ASSERT(world_replica_get(replica, key, &found) == world_error_ok);
+  ASSERT(data.size == found.size);
+  ASSERT(memcmp(data.base, found.base, found.size) == 0);
 
-  struct world_origin *origin;
-};
+  ASSERT(worldaux_server_close(server) == world_error_ok);
+  ASSERT(worldaux_client_close(client) == world_error_ok);
 
-void world_origin_iothread_init(struct world_origin_iothread *ot, struct world_origin *origin);
-void world_origin_iothread_destroy(struct world_origin_iothread *ot);
-void world_origin_iothread_attach(struct world_origin_iothread *ot, int fd);
-void world_origin_iothread_detach(struct world_origin_iothread *ot, int fd);
-void world_origin_iothread_mark_updated(struct world_origin_iothread *ot, int fd);
-void world_origin_iothread_mark_disconnected(struct world_origin_iothread *ot, int fd);
-world_sequence world_origin_iothread_least_sequence(struct world_origin_iothread *ot);
+  return TEST_STATUS;
+}

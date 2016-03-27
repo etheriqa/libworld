@@ -60,6 +60,7 @@ else()
 endif()
 
 list(APPEND HEADERS include/world.h)
+list(APPEND HEADERS include/worldaux.h)
 
 list(APPEND SOURCES src/world_allocator.c)
 list(APPEND SOURCES src/world_circular.c)
@@ -76,6 +77,8 @@ list(APPEND SOURCES src/world_replica_iohandler.c)
 list(APPEND SOURCES src/world_replica_iothread.c)
 list(APPEND SOURCES src/world_system.c)
 list(APPEND SOURCES src/world_vector.c)
+list(APPEND SOURCES src/worldaux_client.c)
+list(APPEND SOURCES src/worldaux_server.c)
 
 include_directories(include)
 
@@ -114,6 +117,10 @@ add_test(NAME e2e/protocol_replica COMMAND e2e_protocol_replica)
 add_executable(e2e_world test/e2e/world.c)
 target_link_libraries(e2e_world world ${CMAKE_THREAD_LIBS_INIT})
 add_test(NAME e2e/world COMMAND e2e_world)
+
+add_executable(e2e_worldaux test/e2e/worldaux.c)
+target_link_libraries(e2e_worldaux world ${CMAKE_THREAD_LIBS_INIT})
+add_test(NAME e2e/worldaux COMMAND e2e_worldaux)
 
 add_executable(e2e_c1k test/e2e/c1k.c)
 target_link_libraries(e2e_c1k world ${CMAKE_THREAD_LIBS_INIT})
