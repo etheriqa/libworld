@@ -24,4 +24,6 @@
 
 #include <stdbool.h>
 
-bool world_test_fd_range(int fd);
+bool world_check_fd(int fd);
+bool world_set_nonblocking(int fd);
+bool world_set_tcp_nodelay(int fd);

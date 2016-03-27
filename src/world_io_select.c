@@ -28,11 +28,12 @@
 #include "world_io.h"
 #include "world_io_select.h"
 
-void world_io_multiplexer_init(struct world_io_multiplexer *m)
+void world_io_multiplexer_init(struct world_io_multiplexer *m, struct world_allocator *a)
 {
   assert(m);
+  assert(a);
 
-  vector_init(&m->handlers);
+  world_vector_init(&m->handlers, a);
   FD_ZERO(&m->read_fds);
   FD_ZERO(&m->write_fds);
   FD_ZERO(&m->error_fds);
@@ -42,7 +43,7 @@ void world_io_multiplexer_destroy(struct world_io_multiplexer *m)
 {
   assert(m);
 
-  vector_destroy(&m->handlers);
+  world_vector_destroy(&m->handlers);
 }
 
 void world_io_multiplexer_attach(struct world_io_multiplexer *m, struct world_io_handler *h)
@@ -50,8 +51,8 @@ void world_io_multiplexer_attach(struct world_io_multiplexer *m, struct world_io
   assert(m);
   assert(h);
 
-  if (h->fd >= vector_size(&m->handlers)) {
-    vector_resize(&m->handlers, h->fd + 1, sizeof(struct world_io_handler *));
+  if (h->fd >= world_vector_size(&m->handlers)) {
+    world_vector_resize(&m->handlers, h->fd + 1, sizeof(struct world_io_handler *));
   }
   *(struct world_io_handler **)vector_at(&m->handlers, h->fd, sizeof(h)) = h;
 }
@@ -61,7 +62,7 @@ void world_io_multiplexer_detach(struct world_io_multiplexer *m, struct world_io
   assert(m);
   assert(h);
 
-  if (h->fd < vector_size(&m->handlers)) {
+  if (h->fd < world_vector_size(&m->handlers)) {
     *(struct world_io_handler **)vector_at(&m->handlers, h->fd, sizeof(h)) = NULL;
   }
 }
@@ -71,8 +72,8 @@ void world_io_multiplexer_dispatch(struct world_io_multiplexer *m)
   FD_ZERO(&m->read_fds);
   FD_ZERO(&m->write_fds);
   FD_ZERO(&m->error_fds);
-  for (size_t i = 0; i < vector_size(&m->handlers); i++) {
-    struct world_io_handler **handler = vector_at(&m->handlers, i, sizeof(*handler));
+  for (size_t i = 0; i < world_vector_size(&m->handlers); i++) {
+    struct world_io_handler **handler = world_vector_at(&m->handlers, i, sizeof(*handler));
     if (!handler || !*handler) {
       continue;
     }
@@ -103,7 +104,7 @@ void world_io_multiplexer_dispatch(struct world_io_multiplexer *m)
 
   for (size_t i = 0; i < FD_SETSIZE; i++) {
     // TODO handle errors
-    struct world_io_handler **handler = vector_at(&m->handlers, i, sizeof(*handler));
+    struct world_io_handler **handler = world_vector_at(&m->handlers, i, sizeof(*handler));
     if (!handler || !*handler) {
       continue;
     }

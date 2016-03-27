@@ -25,26 +25,32 @@
 #include "world_hashtable_bucket.h"
 #include "world_hashtable_entry.h"
 
-void world_hashtable_bucket_init(struct world_hashtable_bucket *b)
+void world_hashtable_bucket_init(struct world_hashtable_bucket *b, struct world_allocator *a)
 {
-  struct world_hashtable_entry *front = world_hashtable_entry_new_bucket(0);
-  vector_init(&b->buckets);
-  vector_push_back(&b->buckets, &front, sizeof(front));
+  struct world_hashtable_entry *front = world_hashtable_entry_new_bucket(a, 0);
+  world_vector_init(&b->buckets, a);
+  world_vector_push_back(&b->buckets, &front, sizeof(front));
   b->front = front;
   b->mask = 0;
 }
 
-void world_hashtable_bucket_destroy(struct world_hashtable_bucket *b)
+void world_hashtable_bucket_destroy(struct world_hashtable_bucket *b, struct world_allocator *a)
 {
-  // TODO free buckets and entries
-  vector_destroy(&b->buckets);
+  struct world_hashtable_entry *cursor = world_hashtable_bucket_front(b);
+  do {
+    struct world_hashtable_entry *next = atomic_load_explicit(&cursor->base.next, memory_order_relaxed);
+    world_hashtable_entry_delete(cursor, a);
+    cursor = next;
+  } while (cursor);
+  world_hashtable_entry_delete(cursor, a);
+  world_vector_destroy(&b->buckets);
 }
 
-void world_hashtable_bucket_append(struct world_hashtable_bucket *b)
+void world_hashtable_bucket_append(struct world_hashtable_bucket *b, struct world_allocator *a)
 {
   size_t index = world_hashtable_bucket_size(b);
   world_hash_type hash = world_hash_reverse(index);
-  struct world_hashtable_entry *bucket = world_hashtable_entry_new_bucket(hash);
+  struct world_hashtable_entry *bucket = world_hashtable_entry_new_bucket(a, hash);
 
   struct world_hashtable_entry *cursor = world_hashtable_bucket_find(b, hash);
   struct world_hashtable_entry *next = NULL;
@@ -60,7 +66,7 @@ void world_hashtable_bucket_append(struct world_hashtable_bucket *b)
 
   atomic_store_explicit(&bucket->base.next, next, memory_order_relaxed);
   atomic_store_explicit(&cursor->base.next, bucket, memory_order_relaxed);
-  vector_push_back(&b->buckets, &bucket, sizeof(bucket));
+  world_vector_push_back(&b->buckets, &bucket, sizeof(bucket));
 
   if ((index & (index - 1)) == 0) {
     b->mask = (b->mask << 1) | 0x1;
@@ -69,7 +75,7 @@ void world_hashtable_bucket_append(struct world_hashtable_bucket *b)
 
 size_t world_hashtable_bucket_size(struct world_hashtable_bucket *b)
 {
-  return vector_size(&b->buckets);
+  return world_vector_size(&b->buckets);
 }
 
 struct world_hashtable_entry *world_hashtable_bucket_front(struct world_hashtable_bucket *b)
@@ -84,6 +90,6 @@ struct world_hashtable_entry *world_hashtable_bucket_find(struct world_hashtable
   if (index >= world_hashtable_bucket_size(b)) {
     index = r & (b->mask >> 1);
   }
-  struct world_hashtable_entry **position = vector_at(&b->buckets, index, sizeof(*position));
+  struct world_hashtable_entry **position = world_vector_at(&b->buckets, index, sizeof(*position));
   return *position;
 }

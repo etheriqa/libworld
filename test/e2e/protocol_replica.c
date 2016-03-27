@@ -41,7 +41,8 @@ int main(void)
   world_replicaconf_init(&rc);
   rc.fd = fds[0];
 
-  struct world_replica *replica = world_replica_open(&rc);
+  struct world_replica *replica;
+  ASSERT(world_replica_open(&replica, &rc) == world_error_ok);
 
   struct world_iovec key, data;
   key.base = "foo";

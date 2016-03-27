@@ -22,31 +22,38 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "world_hash.h"
 #include "world_replica.h"
 
-struct world_replica *world_replica_open(const struct world_replicaconf *conf)
+enum world_error world_replica_open(struct world_replica **r, const struct world_replicaconf *conf)
 {
   // TODO validate conf here
-  struct world_replica *replica = malloc(sizeof(*replica));
-  if (replica == NULL) {
-    perror("malloc");
-    abort();
-  }
+
+  struct world_allocator allocator;
+  world_allocator_init(&allocator);
+  struct world_replica *replica = world_allocator_malloc(&allocator, sizeof(*replica));
+  memcpy(&replica->allocator, &allocator, sizeof(allocator));
 
   memcpy((void *)&replica->conf, conf, sizeof(replica->conf));
-  world_hashtable_init(&replica->hashtable, world_generate_seed());
+  world_hashtable_init(&replica->hashtable, world_generate_seed(), &replica->allocator);
   world_replica_iothread_init(&replica->thread, replica);
 
-  return replica;
+  *r = replica;
+  return world_error_ok;
 }
 
-void world_replica_close(struct world_replica *replica)
+enum world_error world_replica_close(struct world_replica *replica)
 {
-  world_hashtable_destroy(&replica->hashtable);
   world_replica_iothread_destroy(&replica->thread);
+  world_hashtable_destroy(&replica->hashtable);
 
-  free(replica);
+  struct world_allocator allocator;
+  memcpy(&allocator, &replica->allocator, sizeof(allocator));
+  world_allocator_free(&allocator, replica);
+  world_allocator_destroy(&allocator);
+
+  return world_error_ok;
 }
 
 enum world_error world_replica_get(const struct world_replica *replica, struct world_iovec key, struct world_iovec *data)

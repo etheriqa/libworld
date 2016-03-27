@@ -40,8 +40,9 @@ int main(void)
   struct world_originconf oc;
   world_originconf_init(&oc);
 
-  struct world_origin *origin = world_origin_open(&oc);
-  ASSERT_TRUE(world_origin_attach(origin, fds[1]));
+  struct world_origin *origin;
+  ASSERT(world_origin_open(&origin, &oc) == world_error_ok);
+  ASSERT(world_origin_attach(origin, fds[1]) == world_error_ok);
 
   struct world_iovec key, data;
   key.base = "foo";

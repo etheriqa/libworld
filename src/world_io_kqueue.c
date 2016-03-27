@@ -31,7 +31,7 @@
 #include "world_io.h"
 #include "world_io_kqueue.h"
 
-void world_io_multiplexer_init(struct world_io_multiplexer *m)
+void world_io_multiplexer_init(struct world_io_multiplexer *m, struct world_allocator *a)
 {
   assert(m);
   m->fd = kqueue();

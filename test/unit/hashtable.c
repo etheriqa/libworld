@@ -21,13 +21,17 @@
  */
 
 #include <string.h>
+#include "../../src/world_allocator.h"
 #include "../../src/world_hashtable.h"
 #include "../helper.h"
 
 static void test_hashtable_manipulation(void)
 {
+  struct world_allocator allocator;
+  world_allocator_init(&allocator);
+
   struct world_hashtable ht;
-  world_hashtable_init(&ht, 0);
+  world_hashtable_init(&ht, 0, &allocator);
 
   struct world_iovec key, data, found;
 

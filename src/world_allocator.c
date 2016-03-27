@@ -20,51 +20,51 @@
  * SOFTWARE.
  */
 
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
 #include <stdio.h>
-#include <sys/errno.h>
-#include <sys/resource.h>
-#include <sys/socket.h>
-#include "world_system.h"
+#include <stdlib.h>
+#include "world_allocator.h"
 
-bool world_check_fd(int fd)
+void world_allocator_init(struct world_allocator *a)
 {
-  if (fd < 0) {
-    return false;
-  }
-
-  struct rlimit rl;
-  if (getrlimit(RLIMIT_NOFILE, &rl) == -1) {
-    perror("getrlimit");
-    return false;
-  }
-
-  return (rlim_t)fd < rl.rlim_cur;
+  // do nothing for now
 }
 
-bool world_set_nonblocking(int fd)
+void world_allocator_destroy(struct world_allocator *a)
 {
-  if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
-    perror("fcntl");
-    return false;
-  }
-
-  return true;
+  // do nothing for now
 }
 
-bool world_set_tcp_nodelay(int fd)
+void *world_allocator_malloc(struct world_allocator *a, size_t size)
 {
-  int option = 1;
-  if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &option, sizeof(option)) == -1) {
-    if (errno == EOPNOTSUPP) {
-      // do nothing
-    } else {
-      perror("setsockopt");
-      return false;
-    }
+  void *p = malloc(size);
+  if (p == NULL) {
+    perror("malloc");
+    abort();
   }
+  return p;
+}
 
-  return true;
+void *world_allocator_calloc(struct world_allocator *a, size_t count, size_t size)
+{
+  void *p = calloc(count, size);
+  if (p == NULL) {
+    perror("calloc");
+    abort();
+  }
+  return p;
+}
+
+void *world_allocator_realloc(struct world_allocator *restrict a, void *restrict ptr, size_t size)
+{
+  void *p = realloc(ptr, size);
+  if (p == NULL) {
+    perror("realloc");
+    abort();
+  }
+  return p;
+}
+
+void world_allocator_free(struct world_allocator *restrict a, void *restrict ptr)
+{
+  free(ptr);
 }

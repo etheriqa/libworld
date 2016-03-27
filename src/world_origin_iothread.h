@@ -24,27 +24,27 @@
 
 #include <pthread.h>
 #include <stdatomic.h>
-#include "circular.h"
-#include "vector.h"
+#include "world_circular.h"
 #include "world_io.h"
 #include "world_mutex.h"
+#include "world_vector.h"
 
 struct world_origin;
 
 struct world_origin_iothread {
   struct world_origin_iothread_dispatcher {
     struct world_mutex mtx;
-    struct vector handlers;
+    struct world_vector handlers;
     struct world_io_multiplexer multiplexer;
   } dispatcher;
 
   struct world_origin_iothread_updated {
     struct world_mutex mtx;
-    struct circular fds;
+    struct world_circular fds;
   } updated;
 
   struct world_origin_iothread_asleep {
-    struct circular fds;
+    struct world_circular fds;
   } asleep;
 
   pthread_t thread;

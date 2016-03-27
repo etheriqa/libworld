@@ -26,10 +26,11 @@
 
 #define WORLD_IO_MULTIPLEX_TIMEOUT_IN_MILLISECONDS 10
 
+struct world_allocator;
 struct world_io_handler;
 struct world_io_multiplexer;
 
-void world_io_multiplexer_init(struct world_io_multiplexer *m);
+void world_io_multiplexer_init(struct world_io_multiplexer *m, struct world_allocator *a);
 void world_io_multiplexer_destroy(struct world_io_multiplexer *m);
 void world_io_multiplexer_attach(struct world_io_multiplexer *m, struct world_io_handler *h);
 void world_io_multiplexer_detach(struct world_io_multiplexer *m, struct world_io_handler *h);

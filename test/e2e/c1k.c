@@ -51,7 +51,8 @@ int main(void)
   struct world_originconf oc;
   oc.n_io_threads = 4;
   world_originconf_init(&oc);
-  struct world_origin *origin = world_origin_open(&oc);
+  struct world_origin *origin = NULL;
+  ASSERT(world_origin_open(&origin, &oc) == world_error_ok);
 
   struct world_iovec key, data;
   key.base = "foo";
@@ -72,8 +73,8 @@ int main(void)
     struct world_replicaconf rc;
     world_replicaconf_init(&rc);
     rc.fd = fds[0];
-    replicas[i] = world_replica_open(&rc);
-    world_origin_attach(origin, fds[1]);
+    ASSERT(world_replica_open(&replicas[i], &rc) == world_error_ok);
+    ASSERT(world_origin_attach(origin, fds[1]) == world_error_ok);
   }
 
   world_test_sleep_msec(100);

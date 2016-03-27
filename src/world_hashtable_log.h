@@ -25,15 +25,17 @@
 #include <world.h>
 #include "world_hash.h"
 
+struct world_allocator;
 struct world_hashtable_entry;
 
 struct world_hashtable_log {
   struct world_hashtable_entry *head;
   _Atomic(struct world_hashtable_entry *)tail;
+  struct world_hashtable_entry *sentinel;
 };
 
-void world_hashtable_log_init(struct world_hashtable_log *l);
-void world_hashtable_log_destroy(struct world_hashtable_log *l);
+void world_hashtable_log_init(struct world_hashtable_log *l, struct world_allocator *a);
+void world_hashtable_log_destroy(struct world_hashtable_log *l, struct world_allocator *a);
 void world_hashtable_log_push_back(struct world_hashtable_log *l, struct world_hashtable_entry *entry);
 void world_hashtable_log_pop_front(struct world_hashtable_log *l);
 world_sequence world_hashtable_log_least_sequence(struct world_hashtable_log *l);

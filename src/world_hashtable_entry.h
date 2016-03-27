@@ -26,6 +26,8 @@
 #include <world.h>
 #include "world_hash.h"
 
+struct world_allocator;
+
 struct world_hashtable_entry {
   struct {
     world_sequence seq;
@@ -40,9 +42,10 @@ struct world_hashtable_entry {
   } header;
 };
 
-struct world_hashtable_entry *world_hashtable_entry_new(world_hash_type hash, struct world_iovec key, struct world_iovec data);
-struct world_hashtable_entry *world_hashtable_entry_new_void(world_hash_type hash, struct world_iovec key);
-struct world_hashtable_entry *world_hashtable_entry_new_bucket(world_hash_type hash);
+struct world_hashtable_entry *world_hashtable_entry_new(struct world_allocator *a, world_hash_type hash, struct world_iovec key, struct world_iovec data);
+struct world_hashtable_entry *world_hashtable_entry_new_void(struct world_allocator *a, world_hash_type hash, struct world_iovec key);
+struct world_hashtable_entry *world_hashtable_entry_new_bucket(struct world_allocator *a, world_hash_type hash);
+void world_hashtable_entry_delete(struct world_hashtable_entry *entry, struct world_allocator *a);
 bool world_hashtable_entry_is_void(struct world_hashtable_entry *entry);
 bool world_hashtable_entry_is_bucket(struct world_hashtable_entry *entry);
 struct world_hashtable_entry *world_hashtable_entry_advance(struct world_hashtable_entry **entry, world_sequence seq);

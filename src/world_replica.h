@@ -23,10 +23,12 @@
 #pragma once
 
 #include <world.h>
+#include "world_allocator.h"
 #include "world_hashtable.h"
 #include "world_replica_iothread.h"
 
 struct world_replica {
+  struct world_allocator allocator;
   const struct world_replicaconf conf;
   struct world_hashtable hashtable;
   struct world_replica_iothread thread;

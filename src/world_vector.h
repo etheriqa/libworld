@@ -22,22 +22,30 @@
 
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
-#include "world_hash.h"
-#include "world_vector.h"
 
 struct world_allocator;
-struct world_hashtable_entry;
 
-struct world_hashtable_bucket {
-  struct world_vector buckets;
-  struct world_hashtable_entry *front;
-  world_hash_type mask;
+struct world_vector {
+  struct world_allocator *allocator;
+  void *base;
+  size_t capacity;
+  size_t size;
 };
 
-void world_hashtable_bucket_init(struct world_hashtable_bucket *b, struct world_allocator *a);
-void world_hashtable_bucket_destroy(struct world_hashtable_bucket *b, struct world_allocator *a);
-void world_hashtable_bucket_append(struct world_hashtable_bucket *b, struct world_allocator *a);
-size_t world_hashtable_bucket_size(struct world_hashtable_bucket *b);
-struct world_hashtable_entry *world_hashtable_bucket_front(struct world_hashtable_bucket *b);
-struct world_hashtable_entry *world_hashtable_bucket_find(struct world_hashtable_bucket *b, world_hash_type hash);
+typedef bool world_vector_heap_property(const void *, const void *);
+
+void world_vector_init(struct world_vector *v, struct world_allocator *a);
+void world_vector_destroy(struct world_vector *v);
+size_t world_vector_size(struct world_vector *v);
+void world_vector_resize(struct world_vector *v, size_t capacity, size_t size);
+void world_vector_reserve(struct world_vector *v, size_t capacity, size_t size);
+void *world_vector_at(struct world_vector *v, size_t i, size_t size);
+void *world_vector_front(struct world_vector *v);
+void *world_vector_back(struct world_vector *v, size_t size);
+void world_vector_clear(struct world_vector *v);
+void world_vector_push_back(struct world_vector *restrict v, const void *restrict element, size_t size);
+void world_vector_pop_back(struct world_vector *v);
+void world_vector_push_heap(struct world_vector *restrict v, const void *restrict element, size_t size, world_vector_heap_property property);
+void world_vector_pop_heap(struct world_vector *v, size_t size, world_vector_heap_property property);

@@ -24,24 +24,26 @@
 
 #include <stdbool.h>
 #include <world.h>
-#include "vector.h"
 #include "world_hash.h"
 #include "world_hashtable_bucket.h"
 #include "world_hashtable_log.h"
 #include "world_mutex.h"
+#include "world_vector.h"
 
+struct world_allocator;
 struct world_hashtable_entry;
 
 struct world_hashtable {
+  struct world_allocator *allocator;
   struct world_mutex mtx;
   struct world_hashtable_bucket bucket;
   struct world_hashtable_log log;
-  struct vector garbages;
+  struct world_vector garbages;
   world_hash_type seed;
   size_t n_fresh_entries;
 };
 
-void world_hashtable_init(struct world_hashtable *ht, world_hash_type seed);
+void world_hashtable_init(struct world_hashtable *ht, world_hash_type seed, struct world_allocator *a);
 void world_hashtable_destroy(struct world_hashtable *ht);
 enum world_error world_hashtable_get(struct world_hashtable *ht, struct world_iovec key, struct world_iovec *found);
 enum world_error world_hashtable_set(struct world_hashtable *ht, struct world_iovec key, struct world_iovec data);

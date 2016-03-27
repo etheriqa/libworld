@@ -20,10 +20,6 @@
  * SOFTWARE.
  */
 
-/**
- * API Overview
- */
-
 #pragma once
 
 #if defined(__cplusplus)
@@ -101,7 +97,7 @@ struct world_iovec {
 };
 
 /**
- * A handle structure represents an origin ("master").
+ * A handle structure represents an origin ("master" or "publisher").
  */
 struct world_origin;
 
@@ -111,38 +107,41 @@ struct world_origin;
  * Modifying a world_originconf object passed to world_origin_open() after the
  * call returns does not affect a world_origin object.
  *
+ * @param origin A pointer to a world_origin handle.
  * @param conf A pointer to a world_originconf object.
- * @return A pointer to a world_origin object.
+ * @return TODO Not yet implemented.
  * @see world_originconf_init(), world_origin_close()
  */
-struct world_origin *world_origin_open(const struct world_originconf *conf);
+enum world_error world_origin_open(struct world_origin **origin, const struct world_originconf *conf);
 
 /**
  * Closes an origin.
  *
+ * @param origin A world_origin handle.
+ * @return TODO Not yet implemented.
  * @see world_origin_open()
  */
-void world_origin_close(struct world_origin *origin);
+enum world_error world_origin_close(struct world_origin *origin);
 
 /**
  * Attaches a socket to an origin.
  *
- * @param origin A pointer to world_origin object.
+ * @param origin A world_origin handle.
  * @param fd A file descriptor connected to a replica.
  * @return TODO Not yet implemented.
  * @see world_origin_detach()
  */
-bool world_origin_attach(struct world_origin *origin, int fd);
+enum world_error world_origin_attach(struct world_origin *origin, int fd);
 
 /**
  * Detaches a socket from an origin.
  *
- * @param origin A pointer to world_origin object.
+ * @param origin A world_origin handle.
  * @param fd A file descriptor connected to a replica.
  * @return TODO Not yet implemented.
  * @see world_origin_attach()
  */
-bool world_origin_detach(struct world_origin *origin, int fd);
+enum world_error world_origin_detach(struct world_origin *origin, int fd);
 
 enum world_error world_origin_get(const struct world_origin *origin, struct world_iovec key, struct world_iovec *found);
 enum world_error world_origin_set(struct world_origin *origin, struct world_iovec key, struct world_iovec data);
@@ -151,7 +150,7 @@ enum world_error world_origin_replace(struct world_origin *origin, struct world_
 enum world_error world_origin_delete(struct world_origin *origin, struct world_iovec key);
 
 /**
- * A handle structure represents a replica ("slave").
+ * A handle structure represents a replica ("slave" or "subscriber").
  */
 struct world_replica;
 
@@ -161,16 +160,21 @@ struct world_replica;
  * Modifying a world_replicaconf object passed to world_replica_open() after the
  * call returns does not affect a world_replica object.
  *
+ * @param replica A pointer to a world_replica handle.
+ * @param conf A pointer to a world_replicaconf object.
+ * @return TODO Not yet implemented.
  * @see world_replicaconf_init(), world_replica_close()
  */
-struct world_replica *world_replica_open(const struct world_replicaconf *conf);
+enum world_error world_replica_open(struct world_replica **replica, const struct world_replicaconf *conf);
 
 /**
  * Closes a replica.
  *
+ * @param replica A world_replica handle.
+ * @return TODO Not yet implemented.
  * @see world_replica_open()
  */
-void world_replica_close(struct world_replica *replica);
+enum world_error world_replica_close(struct world_replica *replica);
 
 enum world_error world_replica_get(const struct world_replica *replica, struct world_iovec key, struct world_iovec *found);
 

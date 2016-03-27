@@ -20,51 +20,29 @@
  * SOFTWARE.
  */
 
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <stdio.h>
-#include <sys/errno.h>
-#include <sys/resource.h>
-#include <sys/socket.h>
-#include "world_system.h"
+#pragma once
 
-bool world_check_fd(int fd)
-{
-  if (fd < 0) {
-    return false;
-  }
+#include <stddef.h>
 
-  struct rlimit rl;
-  if (getrlimit(RLIMIT_NOFILE, &rl) == -1) {
-    perror("getrlimit");
-    return false;
-  }
+struct world_allocator;
 
-  return (rlim_t)fd < rl.rlim_cur;
-}
+struct world_circular {
+  struct world_allocator *allocator;
+  void *base;
+  size_t capacity;
+  size_t size;
+  size_t offset;
+};
 
-bool world_set_nonblocking(int fd)
-{
-  if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
-    perror("fcntl");
-    return false;
-  }
-
-  return true;
-}
-
-bool world_set_tcp_nodelay(int fd)
-{
-  int option = 1;
-  if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &option, sizeof(option)) == -1) {
-    if (errno == EOPNOTSUPP) {
-      // do nothing
-    } else {
-      perror("setsockopt");
-      return false;
-    }
-  }
-
-  return true;
-}
+void world_circular_init(struct world_circular *c, struct world_allocator *a);
+void world_circular_destroy(struct world_circular *c);
+size_t world_circular_size(struct world_circular *c);
+void world_circular_reserve(struct world_circular *c, size_t capacity, size_t size);
+void *world_circular_at(struct world_circular *c, size_t i, size_t size);
+void *world_circular_front(struct world_circular *c, size_t size);
+void *world_circular_back(struct world_circular *c, size_t size);
+void world_circular_clear(struct world_circular *c);
+void world_circular_push_back(struct world_circular *restrict c, const void *restrict element, size_t size);
+void world_circular_pop_back(struct world_circular *c);
+void world_circular_push_front(struct world_circular *restrict c, const void *restrict element, size_t size);
+void world_circular_pop_front(struct world_circular *c);

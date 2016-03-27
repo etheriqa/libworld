@@ -35,11 +35,7 @@ static void _drain_iovec(struct world_origin_iohandler *oh, struct iovec *iovecs
 
 struct world_origin_iohandler *world_origin_iohandler_new(struct world_origin *origin, struct world_origin_iothread *thread, int fd)
 {
-  struct world_origin_iohandler *oh = malloc(sizeof(*oh));
-  if (oh == NULL) {
-    perror("malloc");
-    abort();
-  }
+  struct world_origin_iohandler *oh = world_allocator_malloc(&origin->allocator, sizeof(*oh));
 
   oh->base.fd = fd;
   oh->base.reader = NULL;
@@ -56,7 +52,7 @@ struct world_origin_iohandler *world_origin_iohandler_new(struct world_origin *o
 
 void world_origin_iohandler_delete(struct world_origin_iohandler *oh)
 {
-  free(oh);
+  world_allocator_free(&oh->origin->allocator, oh);
 }
 
 static void _write(struct world_io_handler *h)

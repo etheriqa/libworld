@@ -20,76 +20,80 @@
  * SOFTWARE.
  */
 
-#include "../../src/circular.h"
+#include "../../src/world_allocator.h"
+#include "../../src/world_circular.h"
 #include "../helper.h"
 
 static void test_circular_manipulation(void)
 {
-  struct circular c;
-  circular_init(&c);
+  struct world_allocator allocator;
+  world_allocator_init(&allocator);
 
-  EXPECT(circular_size(&c) == 0);
+  struct world_circular c;
+  world_circular_init(&c, &allocator);
+
+  EXPECT(world_circular_size(&c) == 0);
 
   int a = 2;
-  circular_push_back(&c, &a, sizeof(int));
-  EXPECT(circular_size(&c) == 1);
-  EXPECT(*(int *)circular_at(&c, 0, sizeof(int)) == a);
+  world_circular_push_back(&c, &a, sizeof(int));
+  EXPECT(world_circular_size(&c) == 1);
+  EXPECT(*(int *)world_circular_at(&c, 0, sizeof(int)) == a);
 
   int b = 3;
-  circular_push_front(&c, &b, sizeof(int));
-  EXPECT(circular_size(&c) == 2);
-  EXPECT(*(int *)circular_at(&c, 0, sizeof(int)) == b);
-  EXPECT(*(int *)circular_at(&c, 1, sizeof(int)) == a);
+  world_circular_push_front(&c, &b, sizeof(int));
+  EXPECT(world_circular_size(&c) == 2);
+  EXPECT(*(int *)world_circular_at(&c, 0, sizeof(int)) == b);
+  EXPECT(*(int *)world_circular_at(&c, 1, sizeof(int)) == a);
 
   int ccccc = 5;
-  circular_push_back(&c, &ccccc, sizeof(int));
-  EXPECT(circular_size(&c) == 3);
-  EXPECT(*(int *)circular_at(&c, 0, sizeof(int)) == b);
-  EXPECT(*(int *)circular_at(&c, 1, sizeof(int)) == a);
-  EXPECT(*(int *)circular_at(&c, 2, sizeof(int)) == ccccc);
+  world_circular_push_back(&c, &ccccc, sizeof(int));
+  EXPECT(world_circular_size(&c) == 3);
+  EXPECT(*(int *)world_circular_at(&c, 0, sizeof(int)) == b);
+  EXPECT(*(int *)world_circular_at(&c, 1, sizeof(int)) == a);
+  EXPECT(*(int *)world_circular_at(&c, 2, sizeof(int)) == ccccc);
 
   int d = 7;
-  circular_push_front(&c, &d, sizeof(int));
-  EXPECT(circular_size(&c) == 4);
-  EXPECT(*(int *)circular_at(&c, 0, sizeof(int)) == d);
-  EXPECT(*(int *)circular_at(&c, 1, sizeof(int)) == b);
-  EXPECT(*(int *)circular_at(&c, 2, sizeof(int)) == a);
-  EXPECT(*(int *)circular_at(&c, 3, sizeof(int)) == ccccc);
+  world_circular_push_front(&c, &d, sizeof(int));
+  EXPECT(world_circular_size(&c) == 4);
+  EXPECT(*(int *)world_circular_at(&c, 0, sizeof(int)) == d);
+  EXPECT(*(int *)world_circular_at(&c, 1, sizeof(int)) == b);
+  EXPECT(*(int *)world_circular_at(&c, 2, sizeof(int)) == a);
+  EXPECT(*(int *)world_circular_at(&c, 3, sizeof(int)) == ccccc);
 
-  circular_pop_back(&c);
-  EXPECT(circular_size(&c) == 3);
-  EXPECT(*(int *)circular_at(&c, 0, sizeof(int)) == d);
-  EXPECT(*(int *)circular_at(&c, 1, sizeof(int)) == b);
-  EXPECT(*(int *)circular_at(&c, 2, sizeof(int)) == a);
+  world_circular_pop_back(&c);
+  EXPECT(world_circular_size(&c) == 3);
+  EXPECT(*(int *)world_circular_at(&c, 0, sizeof(int)) == d);
+  EXPECT(*(int *)world_circular_at(&c, 1, sizeof(int)) == b);
+  EXPECT(*(int *)world_circular_at(&c, 2, sizeof(int)) == a);
 
   for (size_t i = 0; i < 500000; i++) {
     int value = 0;
-    circular_push_back(&c, &value, sizeof(int));
+    world_circular_push_back(&c, &value, sizeof(int));
   }
   for (size_t i = 0; i < 500000; i++) {
     int value = 0;
-    circular_push_front(&c, &value, sizeof(int));
+    world_circular_push_front(&c, &value, sizeof(int));
   }
-  EXPECT(circular_size(&c) == 1000003);
+  EXPECT(world_circular_size(&c) == 1000003);
 
   for (size_t i = 0; i < 500000; i++) {
-    circular_pop_back(&c);
+    world_circular_pop_back(&c);
   }
   for (size_t i = 0; i < 500000; i++) {
-    circular_pop_front(&c);
+    world_circular_pop_front(&c);
   }
-  EXPECT(circular_size(&c) == 3);
+  EXPECT(world_circular_size(&c) == 3);
 
   int product = 1;
-  for (size_t i = 0; i < circular_size(&c); i++) {
-    product *= *(int *)circular_at(&c, i, sizeof(int));
+  for (size_t i = 0; i < world_circular_size(&c); i++) {
+    product *= *(int *)world_circular_at(&c, i, sizeof(int));
   }
   EXPECT(product == 42);
 
-  circular_clear(&c);
-  EXPECT(circular_size(&c) == 0);
+  world_circular_clear(&c);
+  EXPECT(world_circular_size(&c) == 0);
 
-  circular_destroy(&c);
+  world_circular_destroy(&c);
 }
 
 int main(void)

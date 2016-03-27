@@ -33,21 +33,23 @@ static void _mark_garbage(struct world_hashtable *ht, struct world_hashtable_ent
 static void _dispose_garbage(struct world_hashtable *ht, struct world_hashtable_entry *entry);
 static bool _garbage_heap_property(const void *x, const void *y);
 
-void world_hashtable_init(struct world_hashtable *ht, world_hash_type seed)
+void world_hashtable_init(struct world_hashtable *ht, world_hash_type seed, struct world_allocator *a)
 {
   world_mutex_init(&ht->mtx);
-  world_hashtable_bucket_init(&ht->bucket);
-  world_hashtable_log_init(&ht->log);
-  vector_init(&ht->garbages);
+  world_hashtable_bucket_init(&ht->bucket, a);
+  world_hashtable_log_init(&ht->log, a);
+  world_vector_init(&ht->garbages, a);
+  ht->allocator = a;
   ht->seed = seed;
   ht->n_fresh_entries = 0;
 }
 
 void world_hashtable_destroy(struct world_hashtable *ht)
 {
-  vector_destroy(&ht->garbages);
-  world_hashtable_log_destroy(&ht->log);
-  world_hashtable_bucket_destroy(&ht->bucket);
+  world_hashtable_checkpoint(ht, world_hashtable_log_greatest_sequence(&ht->log));
+  world_vector_destroy(&ht->garbages);
+  world_hashtable_log_destroy(&ht->log, ht->allocator);
+  world_hashtable_bucket_destroy(&ht->bucket, ht->allocator);
   world_mutex_destroy(&ht->mtx);
 }
 
@@ -57,15 +59,20 @@ enum world_error world_hashtable_get(struct world_hashtable *ht, struct world_io
     return world_error_invalid_argument;
   }
 
+  enum world_error err = world_error_ok;
+  world_mutex_lock(&ht->mtx);
+
   world_hash_type hash = world_hash(key.base, key.size, ht->seed);
   struct world_hashtable_entry *cursor = NULL;
   if (!_find(ht, hash, key, &cursor)) {
-    return world_error_no_such_key;
+    err = world_error_no_such_key;
+    goto release;
   }
 
   cursor = atomic_load_explicit(&cursor->base.next, memory_order_relaxed);
   if (world_hashtable_entry_is_void(cursor)) {
-    return world_error_no_such_key;
+    err = world_error_no_such_key;
+    goto release;
   }
 
   if (found) {
@@ -74,7 +81,9 @@ enum world_error world_hashtable_get(struct world_hashtable *ht, struct world_io
     found->size = data.size;
   }
 
-  return world_error_ok;
+release:
+  world_mutex_unlock(&ht->mtx);
+  return err;
 }
 
 enum world_error world_hashtable_set(struct world_hashtable *ht, struct world_iovec key, struct world_iovec data)
@@ -89,7 +98,7 @@ enum world_error world_hashtable_set(struct world_hashtable *ht, struct world_io
   struct world_hashtable_entry *cursor = NULL;
   bool found = _find(ht, hash, key, &cursor);
 
-  struct world_hashtable_entry *entry = world_hashtable_entry_new(hash, key, data);
+  struct world_hashtable_entry *entry = world_hashtable_entry_new(ht->allocator, hash, key, data);
   world_hashtable_log_push_back(&ht->log, entry);
 
   struct world_hashtable_entry *next = atomic_load_explicit(&cursor->base.next, memory_order_relaxed);
@@ -131,7 +140,7 @@ enum world_error world_hashtable_add(struct world_hashtable *ht, struct world_io
     goto release;
   }
 
-  struct world_hashtable_entry *entry = world_hashtable_entry_new(hash, key, data);
+  struct world_hashtable_entry *entry = world_hashtable_entry_new(ht->allocator, hash, key, data);
   world_hashtable_log_push_back(&ht->log, entry);
 
   if (found) {
@@ -170,14 +179,14 @@ enum world_error world_hashtable_replace(struct world_hashtable *ht, struct worl
     err = world_error_no_such_key;
     goto release;
   }
+  _mark_garbage(ht, next);
 
-  struct world_hashtable_entry *entry = world_hashtable_entry_new(hash, key, data);
+  struct world_hashtable_entry *entry = world_hashtable_entry_new(ht->allocator, hash, key, data);
   world_hashtable_log_push_back(&ht->log, entry);
 
-  struct world_hashtable_entry *stale = atomic_load_explicit(&cursor->base.next, memory_order_relaxed);
-  _mark_garbage(ht, stale);
-  atomic_store_explicit(&entry->base.next, next, memory_order_relaxed);
-  atomic_store_explicit(&entry->stale, stale, memory_order_relaxed);
+  struct world_hashtable_entry *nextnext = atomic_load_explicit(&next->base.next, memory_order_relaxed);
+  atomic_store_explicit(&entry->base.next, nextnext, memory_order_relaxed);
+  atomic_store_explicit(&entry->stale, next, memory_order_relaxed);
   atomic_store_explicit(&cursor->base.next, entry, memory_order_release);
 
 release:
@@ -203,15 +212,15 @@ enum world_error world_hashtable_delete(struct world_hashtable *ht, struct world
     err = world_error_no_such_key;
     goto release;
   }
+  _mark_garbage(ht, next);
 
-  struct world_hashtable_entry *entry = world_hashtable_entry_new_void(hash, key);
-  _mark_garbage(ht, entry);
+  struct world_hashtable_entry *entry = world_hashtable_entry_new_void(ht->allocator, hash, key);
   world_hashtable_log_push_back(&ht->log, entry);
+  _mark_garbage(ht, entry);
 
-  struct world_hashtable_entry *stale = atomic_load_explicit(&cursor->base.next, memory_order_relaxed);
-  _mark_garbage(ht, stale);
-  atomic_store_explicit(&entry->base.next, next, memory_order_relaxed);
-  atomic_store_explicit(&entry->stale, stale, memory_order_relaxed);
+  struct world_hashtable_entry *nextnext = atomic_load_explicit(&next->base.next, memory_order_relaxed);
+  atomic_store_explicit(&entry->base.next, nextnext, memory_order_relaxed);
+  atomic_store_explicit(&entry->stale, next, memory_order_relaxed);
   atomic_store_explicit(&cursor->base.next, entry, memory_order_release);
   ht->n_fresh_entries--;
 
@@ -238,13 +247,13 @@ void world_hashtable_checkpoint(struct world_hashtable *ht, world_sequence seq)
     world_hashtable_log_pop_front(&ht->log);
   }
 
-  while (vector_size(&ht->garbages) > 0) {
-    struct world_hashtable_entry **position = vector_front(&ht->garbages);
+  while (world_vector_size(&ht->garbages) > 0) {
+    struct world_hashtable_entry **position = world_vector_front(&ht->garbages);
     if ((*position)->base.seq >= world_hashtable_log_least_sequence(&ht->log)) {
       break;
     }
     _dispose_garbage(ht, *position);
-    vector_pop_heap(&ht->garbages, sizeof(*position), _garbage_heap_property);
+    world_vector_pop_heap(&ht->garbages, sizeof(*position), _garbage_heap_property);
   }
 
   world_mutex_unlock(&ht->mtx);
@@ -276,13 +285,13 @@ static bool _find(struct world_hashtable *ht, world_hash_type hash, struct world
 static void _append_bucket(struct world_hashtable *ht)
 {
   if (_load_factor(ht) > 0.9f) {
-    world_hashtable_bucket_append(&ht->bucket);
+    world_hashtable_bucket_append(&ht->bucket, ht->allocator);
   }
 }
 
 static void _mark_garbage(struct world_hashtable *ht, struct world_hashtable_entry *entry)
 {
-  vector_push_heap(&ht->garbages, &entry, sizeof(entry), _garbage_heap_property);
+  world_vector_push_heap(&ht->garbages, &entry, sizeof(entry),_garbage_heap_property);
 }
 
 static void _dispose_garbage(struct world_hashtable *ht, struct world_hashtable_entry *entry)
@@ -333,7 +342,7 @@ static void _dispose_garbage(struct world_hashtable *ht, struct world_hashtable_
   }
 
 found:
-  free(entry);
+  world_hashtable_entry_delete(entry, ht->allocator);
 }
 
 static bool _garbage_heap_property(const void *x, const void *y)

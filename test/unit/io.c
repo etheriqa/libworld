@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include "../../src/world_allocator.h"
 #include "../../src/world_io.h"
 #include "../helper.h"
 
@@ -68,8 +69,11 @@ static void test_world_io_multiplex(void)
   write_handler.n_called_reader = 0;
   write_handler.n_called_writer = 0;
 
+  struct world_allocator allocator;
+  world_allocator_init(&allocator);
+
   struct world_io_multiplexer multiplexer;
-  world_io_multiplexer_init(&multiplexer);
+  world_io_multiplexer_init(&multiplexer, &allocator);
   world_io_multiplexer_attach(&multiplexer, &read_handler.base);
   world_io_multiplexer_attach(&multiplexer, &write_handler.base);
 

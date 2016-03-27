@@ -22,6 +22,7 @@
 
 #include <fcntl.h>
 #include <inttypes.h>
+#include <netdb.h>
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdio.h>
@@ -31,6 +32,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <world.h>
+#include "../../src/world_allocator.h"
 #include "../../src/world_io.h"
 #include "../../src/world_origin.h"
 #include "../helper.h"
@@ -40,7 +42,9 @@ static struct world_origin *_open_origin(size_t n_io_threads)
   struct world_originconf oc;
   world_originconf_init(&oc);
   oc.n_io_threads = n_io_threads;
-  return world_origin_open(&oc);
+  struct world_origin *origin = NULL;
+  ASSERT(world_origin_open(&origin, &oc) == world_error_ok);
+  return origin;
 }
 
 struct _replica {
@@ -161,6 +165,8 @@ static const void *_generate_key(size_t count, size_t size)
 
 int main(int argc, char **argv)
 {
+  char *socket_type = "unix";
+  char *port = "25200";
   size_t n_io_threads = 1;
   size_t n_replicas = 16;
   size_t cardinality = 65536;
@@ -170,7 +176,7 @@ int main(int argc, char **argv)
 
   {
     char c;
-    while ((c = getopt(argc, argv, "cdkrtw")) != -1) {
+    while ((c = getopt(argc, argv, "cdkprstw")) != -1) {
       switch (c) {
       case 'c':
         cardinality = atoi(argv[optind]);
@@ -184,12 +190,20 @@ int main(int argc, char **argv)
         key_size = atoi(argv[optind]);
         optind++;
         break;
+      case 'p':
+        port = argv[optind];
+        optind++;
+        break;
       case 'r':
         n_replicas = atoi(argv[optind]);
         optind++;
         break;
       case 't':
         n_io_threads = atoi(argv[optind]);
+        optind++;
+        break;
+      case 's':
+        socket_type = argv[optind];
         optind++;
         break;
       case 'w':
@@ -200,12 +214,22 @@ int main(int argc, char **argv)
     }
   }
 
-  printf("# of I/O threads (-t) ... %zu\n", n_io_threads);
-  printf("# of replicas    (-r) ... %zu\n", n_replicas);
-  printf("cardinality      (-c) ... %zu\n", cardinality);
-  printf("key size         (-k) ... %zu\n", key_size);
-  printf("data size        (-d) ... %zu\n", data_size);
-  printf("watermark        (-w) ... %zu\n", watermark);
+  if (strcmp(socket_type, "unix") != 0 && strcmp(socket_type, "tcp") != 0) {
+    printf("Unknown socket type: %s\n", socket_type);
+    exit(EXIT_FAILURE);
+  }
+
+  printf("socket type (unix|tcp) (-s) ... %s\n", socket_type);
+  printf("port                   (-p) ... %s\n", port);
+  printf("# of I/O threads       (-t) ... %zu\n", n_io_threads);
+  printf("# of replicas          (-r) ... %zu\n", n_replicas);
+  printf("cardinality            (-c) ... %zu\n", cardinality);
+  printf("key size               (-k) ... %zu\n", key_size);
+  printf("data size              (-d) ... %zu\n", data_size);
+  printf("watermark              (-w) ... %zu\n", watermark);
+
+  struct world_allocator allocator;
+  world_allocator_init(&allocator);
 
   struct world_io_multiplexer *multiplexers = calloc(n_io_threads, sizeof(*multiplexers));
   if (multiplexers == NULL) {
@@ -213,7 +237,7 @@ int main(int argc, char **argv)
     abort();
   }
   for (size_t i = 0; i < n_io_threads; i++) {
-    world_io_multiplexer_init(multiplexers + i);
+    world_io_multiplexer_init(multiplexers + i, &allocator);
   }
 
   struct world_origin *origin = _open_origin(n_io_threads);
@@ -223,15 +247,65 @@ int main(int argc, char **argv)
     perror("calloc");
     abort();
   }
-  for (size_t i = 0; i < n_replicas; i++) {
-    int fds[2];
-    if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == -1) {
-      perror("socketpair");
+
+  if (strcmp(socket_type, "unix") == 0) {
+    for (size_t i = 0; i < n_replicas; i++) {
+      int fds[2];
+      if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == -1) {
+        perror("socketpair");
+        abort();
+      }
+      world_origin_attach(origin, fds[1]);
+      _replica_init(&replicas[i], fds[0]);
+      world_io_multiplexer_attach(&multiplexers[i % n_io_threads], &replicas[i].base);
+    }
+  }
+
+  if (strcmp(socket_type, "tcp") == 0) {
+    struct addrinfo hint, *ai;
+    memset(&hint, 0, sizeof(hint));
+    hint.ai_family = AF_INET;
+    hint.ai_socktype = SOCK_STREAM;
+    int err = getaddrinfo("127.0.0.1", port, &hint, &ai);
+    if (err) {
+      fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(err));
       abort();
     }
-    world_origin_attach(origin, fds[1]);
-    _replica_init(&replicas[i], fds[0]);
-    world_io_multiplexer_attach(&multiplexers[i % n_io_threads], &replicas[i].base);
+
+    int listen_fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+    if (listen_fd == -1) {
+      perror("socket");
+      abort();
+    }
+    int opt = 1;
+    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
+      perror("setsockopt");
+      abort();
+    }
+    if (bind(listen_fd, ai->ai_addr, ai->ai_addrlen) == -1) {
+      perror("bind");
+      abort();
+    }
+    if (listen(listen_fd, n_replicas) == -1) {
+      perror("listen");
+      abort();
+    }
+
+    for (size_t i = 0; i < n_replicas; i++) {
+      int replica_fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+      if (replica_fd == -1) {
+        perror("socket");
+        abort();
+      }
+      if (connect(replica_fd, ai->ai_addr, ai->ai_addrlen) == -1) {
+        perror("connect");
+        abort();
+      }
+      int origin_fd = accept(listen_fd, NULL, NULL);
+      world_origin_attach(origin, origin_fd);
+      _replica_init(&replicas[i], replica_fd);
+      world_io_multiplexer_attach(&multiplexers[i % n_io_threads], &replicas[i].base);
+    }
   }
 
   for (size_t i = 0; i < n_io_threads; i++) {

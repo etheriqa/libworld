@@ -20,93 +20,85 @@
  * SOFTWARE.
  */
 
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/errno.h>
-#include <sys/socket.h>
 #include "world_hash.h"
 #include "world_hashtable_entry.h"
 #include "world_origin.h"
 #include "world_origin_iothread.h"
+#include "world_system.h"
 
 static struct world_origin_iothread *_iothread(struct world_origin *origin, int fd);
 static world_sequence _least_sequence(struct world_origin *origin);
 static void _checkpoint(struct world_origin *origin);
 
-struct world_origin *world_origin_open(const struct world_originconf *conf)
+enum world_error world_origin_open(struct world_origin **o, const struct world_originconf *conf)
 {
   // TODO validate conf here
 
-  struct world_origin *origin = malloc(sizeof(*origin));
-  if (origin == NULL) {
-    perror("malloc");
-    abort();
-  }
+  struct world_allocator allocator;
+  world_allocator_init(&allocator);
+  struct world_origin *origin = world_allocator_malloc(&allocator, sizeof(*origin));
+  memcpy(&origin->allocator, &allocator, sizeof(allocator));
 
   memcpy((void *)&origin->conf, conf, sizeof(origin->conf));
-  world_hashtable_init(&origin->hashtable, world_generate_seed());
+  world_hashtable_init(&origin->hashtable, world_generate_seed(), &origin->allocator);
 
-  origin->threads = calloc(origin->conf.n_io_threads, sizeof(*origin->threads));
-  if (origin->threads == NULL) {
-    perror("calloc");
-    abort();
-  }
+  origin->threads = world_allocator_calloc(&origin->allocator, origin->conf.n_io_threads, sizeof(*origin->threads));
   for (size_t i = 0; i < origin->conf.n_io_threads; i++) {
     world_origin_iothread_init(&origin->threads[i], origin);
   }
 
-  return origin;
+  *o = origin;
+  return world_error_ok;
 }
 
-void world_origin_close(struct world_origin *origin)
+enum world_error world_origin_close(struct world_origin *origin)
 {
   for (size_t i = 0; i < origin->conf.n_io_threads; i++) {
     world_origin_iothread_destroy(&origin->threads[i]);
   }
 
   world_hashtable_destroy(&origin->hashtable);
+  world_allocator_free(&origin->allocator, origin->threads);
 
-  free(origin->threads);
-  free(origin);
+  struct world_allocator allocator;
+  memcpy(&allocator, &origin->allocator, sizeof(allocator));
+  world_allocator_free(&allocator, origin);
+  world_allocator_destroy(&allocator);
+
+  return world_error_ok;
 }
 
-bool world_origin_attach(struct world_origin *origin, int fd)
+enum world_error world_origin_attach(struct world_origin *origin, int fd)
 {
-  // TODO check whether the value of fd fits into [0, RLIMIT_NOFILE) by calling getrlimit(2)
-  // TODO return value
-
-  if (origin->conf.set_nonblocking) {
-    if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
-      perror("fcntl");
-      abort();
-    }
+  if (!world_check_fd(fd)) {
+    return world_error_invalid_argument;
   }
 
-  if (origin->conf.set_tcp_nodelay) {
-    int option = 1;
-    if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &option, sizeof(option)) == -1) {
-      if (errno == EOPNOTSUPP) {
-        // do nothing
-      } else {
-        perror("setsockopt");
-        abort();
-      }
-    }
+  if (origin->conf.set_nonblocking && !world_set_nonblocking(fd)) {
+    return world_error_system;
+  }
+
+  if (origin->conf.set_tcp_nodelay && !world_set_tcp_nodelay(fd)) {
+    return world_error_system;
   }
 
   world_origin_iothread_attach(_iothread(origin, fd), fd);
-  return true; // TODO
+
+  return world_error_ok;
 }
 
-bool world_origin_detach(struct world_origin *origin, int fd)
+enum world_error world_origin_detach(struct world_origin *origin, int fd)
 {
-  // TODO check whether the value of fd fits into [0, RLIMIT_NOFILE) by calling getrlimit(2)
+  if (!world_check_fd(fd)) {
+    return world_error_invalid_argument;
+  }
+
   world_origin_iothread_detach(_iothread(origin, fd), fd);
-  return true; // TODO
+
+  return world_error_ok;
 }
 
 enum world_error world_origin_get(const struct world_origin *origin, struct world_iovec key, struct world_iovec *data)

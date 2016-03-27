@@ -22,9 +22,9 @@
 
 #pragma once
 
-#include "vector.h"
+#include "world_vector.h"
 
 struct world_io_multiplexer {
-  struct vector handlers;
-  struct vector poll_fds;
+  struct world_vector handlers;
+  struct world_vector poll_fds;
 };

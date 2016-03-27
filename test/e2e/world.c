@@ -42,8 +42,10 @@ int main(void)
   world_replicaconf_init(&rc);
   rc.fd = fds[0];
 
-  struct world_origin *origin = world_origin_open(&oc);
-  struct world_replica *replica = world_replica_open(&rc);
+  struct world_origin *origin;
+  ASSERT(world_origin_open(&origin, &oc) == world_error_ok);
+  struct world_replica *replica;
+  ASSERT(world_replica_open(&replica, &rc) == world_error_ok);
 
   struct world_iovec key, data, found;
   key.base = "foo";
@@ -54,7 +56,7 @@ int main(void)
   ASSERT(world_origin_set(origin, key, data) == world_error_ok);
   ASSERT(world_replica_get(replica, key, NULL) == world_error_no_such_key);
 
-  ASSERT_TRUE(world_origin_attach(origin, fds[1]));
+  ASSERT(world_origin_attach(origin, fds[1]) == world_error_ok);
 
   world_test_sleep_msec(100);
 
@@ -75,7 +77,7 @@ int main(void)
   ASSERT(found.size == data.size);
   ASSERT(memcmp(found.base, data.base, data.size) == 0);
 
-  world_origin_close(origin);
+  ASSERT(world_origin_close(origin) == world_error_ok);
   world_replica_close(replica);
 
   return TEST_STATUS;

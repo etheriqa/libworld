@@ -63,7 +63,7 @@ void world_replica_iohandler_init(struct world_replica_iohandler *rh, struct wor
 
 void world_replica_iohandler_destroy(struct world_replica_iohandler *rh)
 {
-  free(rh->body.buffer);
+  world_allocator_free(&rh->replica->allocator, rh->body.buffer);
 }
 
 static void _read(struct world_io_handler *h)
@@ -98,11 +98,7 @@ static void _reserve_body_buffer(struct world_replica_iohandler *rh)
   if (rh->body.capacity >= body_size) {
     return;
   }
-  rh->body.buffer = realloc(rh->body.buffer, body_size);
-  if (rh->body.buffer == NULL) {
-    perror("realloc");
-    abort();
-  }
+  rh->body.buffer = world_allocator_realloc(&rh->replica->allocator, rh->body.buffer, body_size);
 }
 
 static size_t _key_size(struct world_replica_iohandler *rh)

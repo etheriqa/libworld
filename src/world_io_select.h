@@ -23,10 +23,10 @@
 #pragma once
 
 #include <sys/select.h>
-#include "vector.h"
+#include "world_vector.h"
 
 struct world_io_multiplexer {
-  struct vector handlers;
+  struct world_vector handlers;
   fd_set read_fds;
   fd_set write_fds;
   fd_set error_fds;

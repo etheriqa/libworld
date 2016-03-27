@@ -22,9 +22,8 @@
 
 #include <stdatomic.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include "world_allocator.h"
 #include "world_assert.h"
 #include "world_byteorder.h"
 #include "world_hashtable_entry.h"
@@ -35,13 +34,9 @@ static world_key_size _data_size(struct world_hashtable_entry *entry);
 static void *_key_base(struct world_hashtable_entry *entry);
 static void *_data_base(struct world_hashtable_entry *entry);
 
-struct world_hashtable_entry *world_hashtable_entry_new(world_hash_type hash, struct world_iovec key, struct world_iovec data)
+struct world_hashtable_entry *world_hashtable_entry_new(struct world_allocator *a, world_hash_type hash, struct world_iovec key, struct world_iovec data)
 {
-  struct world_hashtable_entry *entry = malloc(sizeof(*entry) + key.size + data.size);
-  if (entry == NULL) {
-    perror("malloc");
-    abort();
-  }
+  struct world_hashtable_entry *entry = world_allocator_malloc(a, sizeof(*entry) + key.size + data.size);
 
   entry->base.seq = 0;
   entry->base.hash = hash;
@@ -56,13 +51,9 @@ struct world_hashtable_entry *world_hashtable_entry_new(world_hash_type hash, st
   return entry;
 }
 
-struct world_hashtable_entry *world_hashtable_entry_new_void(world_hash_type hash, struct world_iovec key)
+struct world_hashtable_entry *world_hashtable_entry_new_void(struct world_allocator *a, world_hash_type hash, struct world_iovec key)
 {
-  struct world_hashtable_entry *entry = malloc(sizeof(*entry) + key.size);
-  if (entry == NULL) {
-    perror("malloc");
-    abort();
-  }
+  struct world_hashtable_entry *entry = world_allocator_malloc(a, sizeof(*entry) + key.size);
 
   entry->base.seq = 0;
   entry->base.hash = hash;
@@ -76,19 +67,20 @@ struct world_hashtable_entry *world_hashtable_entry_new_void(world_hash_type has
   return entry;
 }
 
-struct world_hashtable_entry *world_hashtable_entry_new_bucket(world_hash_type hash)
+struct world_hashtable_entry *world_hashtable_entry_new_bucket(struct world_allocator *a, world_hash_type hash)
 {
-  struct world_hashtable_entry *entry = malloc(sizeof(entry->base));
-  if (entry == NULL) {
-    perror("malloc");
-    abort();
-  }
+  struct world_hashtable_entry *entry = world_allocator_malloc(a, sizeof(entry->base));
 
   entry->base.seq = 0;
   entry->base.hash = hash;
   atomic_store_explicit(&entry->base.next, NULL, memory_order_relaxed);
 
   return entry;
+}
+
+void world_hashtable_entry_delete(struct world_hashtable_entry *entry, struct world_allocator *a)
+{
+  world_allocator_free(a, entry);
 }
 
 bool world_hashtable_entry_is_void(struct world_hashtable_entry *entry)

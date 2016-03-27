@@ -31,19 +31,19 @@ static void *_main(void *arg);
 static void _sleep_updated_handlers(struct world_origin_iothread *ot);
 static void _wake_asleep_handlers(struct world_origin_iothread *ot);
 
-static void _dispatcher_init(struct world_origin_iothread_dispatcher *dp);
+static void _dispatcher_init(struct world_origin_iothread_dispatcher *dp, struct world_allocator *a);
 static void _dispatcher_destroy(struct world_origin_iothread_dispatcher *dp);
 static void _dispatcher_attach(struct world_origin_iothread_dispatcher *dp, int fd, struct world_origin_iothread *ot);
 static void _dispatcher_detach(struct world_origin_iothread_dispatcher *dp, int fd);
 static struct world_origin_iohandler **_dispatcher_get_iohandler(struct world_origin_iothread_dispatcher *dp, int fd);
 
-static void _updated_init(struct world_origin_iothread_updated *up);
+static void _updated_init(struct world_origin_iothread_updated *up, struct world_allocator *a);
 static void _updated_destroy(struct world_origin_iothread_updated *up);
 static int *_updated_top(struct world_origin_iothread_updated *up);
 static void _updated_enqueue(struct world_origin_iothread_updated *up, int fd);
 static void _updated_dequeue(struct world_origin_iothread_updated *up);
 
-static void _asleep_init(struct world_origin_iothread_asleep *as);
+static void _asleep_init(struct world_origin_iothread_asleep *as, struct world_allocator *a);
 static void _asleep_destroy(struct world_origin_iothread_asleep *as);
 static int *_asleep_top(struct world_origin_iothread_asleep *as);
 static void _asleep_enqueue(struct world_origin_iothread_asleep *as, int fd);
@@ -51,9 +51,9 @@ static void _asleep_dequeue(struct world_origin_iothread_asleep *as);
 
 void world_origin_iothread_init(struct world_origin_iothread *ot, struct world_origin *origin)
 {
-  _dispatcher_init(&ot->dispatcher);
-  _updated_init(&ot->updated);
-  _asleep_init(&ot->asleep);
+  _dispatcher_init(&ot->dispatcher, &ot->origin->allocator);
+  _updated_init(&ot->updated, &ot->origin->allocator);
+  _asleep_init(&ot->asleep, &ot->origin->allocator);
 
   ot->origin = origin;
 
@@ -102,8 +102,8 @@ void world_origin_iothread_mark_updated(struct world_origin_iothread *ot, int fd
 world_sequence world_origin_iothread_least_sequence(struct world_origin_iothread *ot)
 {
   world_sequence seq = world_hashtable_log(&ot->origin->hashtable)->base.seq;
-  for (size_t i = 0; i < vector_size(&ot->dispatcher.handlers); i++) {
-    struct world_origin_iohandler **handler = vector_at(&ot->dispatcher.handlers, i, sizeof(*handler));
+  for (size_t i = 0; i < world_vector_size(&ot->dispatcher.handlers); i++) {
+    struct world_origin_iohandler **handler = world_vector_at(&ot->dispatcher.handlers, i, sizeof(*handler));
     if (!*handler) {
       continue;
     }
@@ -161,31 +161,31 @@ static void _wake_asleep_handlers(struct world_origin_iothread *ot)
   }
 }
 
-static void _dispatcher_init(struct world_origin_iothread_dispatcher *dp)
+static void _dispatcher_init(struct world_origin_iothread_dispatcher *dp, struct world_allocator *a)
 {
   world_mutex_init(&dp->mtx);
-  vector_init(&dp->handlers);
-  world_io_multiplexer_init(&dp->multiplexer);
+  world_vector_init(&dp->handlers, a);
+  world_io_multiplexer_init(&dp->multiplexer, a);
 }
 
 static void _dispatcher_destroy(struct world_origin_iothread_dispatcher *dp)
 {
   struct world_origin_iohandler **handler;
-  while ((handler = vector_back(&dp->handlers, sizeof(*handler)))) {
+  while ((handler = world_vector_back(&dp->handlers, sizeof(*handler)))) {
     if (*handler) {
       world_origin_iohandler_delete(*handler);
     }
-    vector_pop_back(&dp->handlers);
+    world_vector_pop_back(&dp->handlers);
   }
 
   world_mutex_destroy(&dp->mtx);
-  vector_destroy(&dp->handlers);
+  world_vector_destroy(&dp->handlers);
   world_io_multiplexer_destroy(&dp->multiplexer);
 }
 
 static void _dispatcher_attach(struct world_origin_iothread_dispatcher *dp, int fd, struct world_origin_iothread *ot)
 {
-  vector_resize(&dp->handlers, fd + 1, sizeof(struct world_origin_iohandler *));
+  world_vector_resize(&dp->handlers, fd + 1, sizeof(struct world_origin_iohandler *));
 
   struct world_origin_iohandler **handler = _dispatcher_get_iohandler(dp, fd);
   if (*handler) {
@@ -208,60 +208,60 @@ static void _dispatcher_detach(struct world_origin_iothread_dispatcher *dp, int 
 
 static struct world_origin_iohandler **_dispatcher_get_iohandler(struct world_origin_iothread_dispatcher *dp, int fd)
 {
-  if (vector_size(&dp->handlers) < (size_t)fd + 1) {
+  if (world_vector_size(&dp->handlers) < (size_t)fd + 1) {
     return NULL;
   }
-  return vector_at(&dp->handlers, fd, sizeof(struct world_origin_iohandler *));
+  return world_vector_at(&dp->handlers, fd, sizeof(struct world_origin_iohandler *));
 }
 
-static void _updated_init(struct world_origin_iothread_updated *up)
+static void _updated_init(struct world_origin_iothread_updated *up, struct world_allocator *a)
 {
   world_mutex_init(&up->mtx);
-  circular_init(&up->fds);
+  world_circular_init(&up->fds, a);
 }
 
 static void _updated_destroy(struct world_origin_iothread_updated *up)
 {
   world_mutex_destroy(&up->mtx);
-  circular_destroy(&up->fds);
+  world_circular_destroy(&up->fds);
 }
 
 static int *_updated_top(struct world_origin_iothread_updated *up)
 {
-  return circular_front(&up->fds, sizeof(int));
+  return world_circular_front(&up->fds, sizeof(int));
 }
 
 static void _updated_enqueue(struct world_origin_iothread_updated *up, int fd)
 {
-  circular_push_back(&up->fds, &fd, sizeof(fd));
+  world_circular_push_back(&up->fds, &fd, sizeof(fd));
 }
 
 static void _updated_dequeue(struct world_origin_iothread_updated *up)
 {
-  circular_pop_front(&up->fds);
+  world_circular_pop_front(&up->fds);
 }
 
-static void _asleep_init(struct world_origin_iothread_asleep *as)
+static void _asleep_init(struct world_origin_iothread_asleep *as, struct world_allocator *a)
 {
-  circular_init(&as->fds);
+  world_circular_init(&as->fds, a);
 }
 
 static void _asleep_destroy(struct world_origin_iothread_asleep *as)
 {
-  circular_destroy(&as->fds);
+  world_circular_destroy(&as->fds);
 }
 
 static int *_asleep_top(struct world_origin_iothread_asleep *as)
 {
-  return circular_front(&as->fds, sizeof(int));
+  return world_circular_front(&as->fds, sizeof(int));
 }
 
 static void _asleep_enqueue(struct world_origin_iothread_asleep *as, int fd)
 {
-  circular_push_back(&as->fds, &fd, sizeof(fd));
+  world_circular_push_back(&as->fds, &fd, sizeof(fd));
 }
 
 static void _asleep_dequeue(struct world_origin_iothread_asleep *as)
 {
-  circular_pop_front(&as->fds);
+  world_circular_pop_front(&as->fds);
 }

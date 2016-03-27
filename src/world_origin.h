@@ -23,11 +23,13 @@
 #pragma once
 
 #include <world.h>
+#include "world_allocator.h"
 #include "world_hashtable.h"
 
 struct world_origin_iothread;
 
 struct world_origin {
+  struct world_allocator allocator;
   const struct world_originconf conf;
   struct world_hashtable hashtable;
   struct world_origin_iothread *threads;

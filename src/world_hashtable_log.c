@@ -21,23 +21,25 @@
  */
 
 #include <stdatomic.h>
+#include <stdlib.h>
 #include "world_assert.h"
 #include "world_hashtable_entry.h"
 #include "world_hashtable_log.h"
 
-void world_hashtable_log_init(struct world_hashtable_log *l)
+void world_hashtable_log_init(struct world_hashtable_log *l, struct world_allocator *a)
 {
   struct world_iovec key;
   key.base = NULL;
   key.size = 0;
-  struct world_hashtable_entry *sentinel = world_hashtable_entry_new_void(0, key);
+  struct world_hashtable_entry *sentinel = world_hashtable_entry_new_void(a, 0, key);
   l->head = sentinel;
+  l->sentinel = sentinel;
   atomic_store_explicit(&l->tail, sentinel, memory_order_relaxed);
 }
 
-void world_hashtable_log_destroy(struct world_hashtable_log *l)
+void world_hashtable_log_destroy(struct world_hashtable_log *l, struct world_allocator *a)
 {
-  // TODO
+  world_hashtable_entry_delete(l->sentinel, a);
 }
 
 void world_hashtable_log_push_back(struct world_hashtable_log *l, struct world_hashtable_entry *entry)

@@ -29,20 +29,21 @@
 #include "world_io.h"
 #include "world_io_poll.h"
 
-void world_io_multiplexer_init(struct world_io_multiplexer *m)
+void world_io_multiplexer_init(struct world_io_multiplexer *m, struct world_allocator *a)
 {
   assert(m);
+  assert(a);
 
-  vector_init(&m->handlers);
-  vector_init(&m->poll_fds);
+  world_vector_init(&m->handlers, a);
+  world_vector_init(&m->poll_fds, a);
 }
 
 void world_io_multiplexer_destroy(struct world_io_multiplexer *m)
 {
   assert(m);
 
-  vector_destroy(&m->handlers);
-  vector_destroy(&m->poll_fds);
+  world_vector_destroy(&m->handlers);
+  world_vector_destroy(&m->poll_fds);
 }
 
 void world_io_multiplexer_attach(struct world_io_multiplexer *m, struct world_io_handler *h)
@@ -50,8 +51,8 @@ void world_io_multiplexer_attach(struct world_io_multiplexer *m, struct world_io
   assert(m);
   assert(h);
 
-  if (h->fd >= vector_size(&m->handlers)) {
-    vector_resize(&m->handlers, h->fd + 1, sizeof(struct world_io_handler *));
+  if (h->fd >= world_vector_size(&m->handlers)) {
+    world_vector_resize(&m->handlers, h->fd + 1, sizeof(struct world_io_handler *));
   }
   *(struct world_io_handler **)vector_at(&m->handlers, h->fd, sizeof(h)) = h;
 }
@@ -61,16 +62,16 @@ void world_io_multiplexer_detach(struct world_io_multiplexer *m, struct world_io
   assert(m);
   assert(h);
 
-  if (h->fd < vector_size(&m->handlers)) {
+  if (h->fd < world_vector_size(&m->handlers)) {
     *(struct world_io_handler **)vector_at(&m->handlers, h->fd, sizeof(h)) = NULL;
   }
 }
 
 void world_io_multiplexer_dispatch(struct world_io_multiplexer *m)
 {
-  vector_clear(&m->poll_fds);
-  for (size_t i = 0; i < vector_size(&m->handlers); i++) {
-    struct world_io_handler **handler = vector_at(&m->handlers, i, sizeof(*handler));
+  world_vector_clear(&m->poll_fds);
+  for (size_t i = 0; i < world_vector_size(&m->handlers); i++) {
+    struct world_io_handler **handler = world_vector_at(&m->handlers, i, sizeof(*handler));
     if (!handler || !*handler) {
       continue;
     }
@@ -79,12 +80,12 @@ void world_io_multiplexer_dispatch(struct world_io_multiplexer *m)
     event.fd = (*handler)->fd;
     event.events = ((*handler)->reader ? POLLIN : 0) |
                    ((*handler)->writer ? POLLOUT : 0);
-    vector_push_back(&m->poll_fds, &event, sizeof(event));
+    world_vector_push_back(&m->poll_fds, &event, sizeof(event));
   }
 
   int n_events;
   for (;;) {
-    n_events = poll(vector_front(&m->poll_fds), vector_size(&m->poll_fds), WORLD_IO_MULTIPLEX_TIMEOUT_IN_MILLISECONDS);
+    n_events = poll(vector_front(&m->poll_fds), world_vector_size(&m->poll_fds), WORLD_IO_MULTIPLEX_TIMEOUT_IN_MILLISECONDS);
     if (n_events != -1) {
       break;
     }
@@ -95,10 +96,10 @@ void world_io_multiplexer_dispatch(struct world_io_multiplexer *m)
     abort();
   }
 
-  for (size_t i = 0; i < vector_size(&m->poll_fds); i++) {
+  for (size_t i = 0; i < world_vector_size(&m->poll_fds); i++) {
     // TODO handle errors (POLLERR, POLLHUP, POLLNVAL)
-    struct pollfd *event = vector_at(&m->poll_fds, i, sizeof(*event));
-    struct world_io_handler **handler = vector_at(&m->handlers, event->fd, sizeof(*handler));
+    struct pollfd *event = world_vector_at(&m->poll_fds, i, sizeof(*event));
+    struct world_io_handler **handler = world_vector_at(&m->handlers, event->fd, sizeof(*handler));
     if (!handler || !*handler) {
       continue;
     }

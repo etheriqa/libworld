@@ -29,47 +29,42 @@ Benchmark
 
 All the following results are measured on OS X 10.11.3 with Intel Core i5-4250U.
 
-## 0 clients
+### Throughput
+
+#### 16 clients
 
 ```sh
-% ./bench_concurrent -r 0
-# of I/O threads (-t) ... 1
-# of replicas    (-r) ... 0
-cardinality      (-c) ... 65536
-key size         (-k) ... 16
-data size        (-d) ... 64
-watermark        (-w) ... 1024
-seq 14571970-14571970, 0.0 MB/s, 0.000 M messages/s, 1456.412 K op/s
-seq 29362144-29362145, 0.0 MB/s, 0.000 M messages/s, 1478.687 K op/s
-seq 44044247-44044247, 0.0 MB/s, 0.000 M messages/s, 1468.083 K op/s
+% ./bench_log -s tcp -r 16
+socket type (unix|tcp) (-s) ... tcp
+port                   (-p) ... 25200
+# of I/O threads       (-t) ... 1
+# of replicas          (-r) ... 16
+cardinality            (-c) ... 65536
+key size               (-k) ... 16
+data size              (-d) ... 64
+watermark              (-w) ... 1024
+seq 2088384-2089281, 280.7 MB/s, 3.341 M messages/s, 208.830 K op/s
+seq 4163648-4164672, 278.9 MB/s, 3.321 M messages/s, 207.520 K op/s
+seq 6191424-6192448, 272.4 MB/s, 3.243 M messages/s, 202.678 K op/s
 ```
 
-## 16 clients, UNIX-domain socket
+#### 1024 clients
 
 ```sh
-% ./bench_concurrent -r 16
-# of I/O threads (-t) ... 1
-# of replicas    (-r) ... 16
-cardinality      (-c) ... 65536
-key size         (-k) ... 16
-data size        (-d) ... 64
-watermark        (-w) ... 1024
-seq 4494718-4495743, 603.9 MB/s, 7.190 M messages/s, 449.273 K op/s
-seq 9055893-9056917, 612.8 MB/s, 7.295 M messages/s, 455.993 K op/s
-seq 13656719-13657168, 618.2 MB/s, 7.359 M messages/s, 459.988 K op/s
+% ./bench_log -s tcp -r 1024
+socket type (unix|tcp) (-s) ... tcp
+port                   (-p) ... 25200
+# of I/O threads       (-t) ... 1
+# of replicas          (-r) ... 1024
+cardinality            (-c) ... 65536
+key size               (-k) ... 16
+data size              (-d) ... 64
+watermark              (-w) ... 1024
+seq 34241-35279, 295.0 MB/s, 3.512 M messages/s, 3.423 K op/s
+seq 68736-69767, 296.4 MB/s, 3.529 M messages/s, 3.449 K op/s
+seq 103104-104142, 295.8 MB/s, 3.521 M messages/s, 3.437 K op/s
 ```
 
-## 1024 clients, UNIX-domain socket
+### Latency
 
-```sh
-% ./bench_concurrent -r 1024
-# of I/O threads (-t) ... 1
-# of replicas    (-r) ... 1024
-cardinality      (-c) ... 65536
-key size         (-k) ... 16
-data size        (-d) ... 64
-watermark        (-w) ... 1024
-seq 76672-77699, 659.8 MB/s, 7.855 M messages/s, 7.667 K op/s
-seq 154624-155656, 670.5 MB/s, 7.982 M messages/s, 7.792 K op/s
-seq 230805-231831, 654.7 MB/s, 7.795 M messages/s, 7.614 K op/s
-```
+WIP
