@@ -51,6 +51,7 @@ enum world_error {
  */
 struct world_originconf {
   size_t n_io_threads;
+  bool ignore_sigpipe;
   bool set_nonblocking;
   bool set_tcp_nodelay;
   bool close_on_destroy;
@@ -65,6 +66,7 @@ struct world_originconf {
 static inline void world_originconf_init(struct world_originconf *conf)
 {
   conf->n_io_threads = 1;
+  conf->ignore_sigpipe = true;
   conf->set_nonblocking = true;
   conf->set_tcp_nodelay = true;
   conf->close_on_destroy = true; // TODO Not yet implemented.

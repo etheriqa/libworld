@@ -37,6 +37,10 @@ enum world_error world_origin_open(struct world_origin **o, const struct world_o
 {
   // TODO validate conf here
 
+  if (conf->ignore_sigpipe && !world_ignore_sigpipe()) {
+    return world_error_system;
+  }
+
   struct world_allocator allocator;
   world_allocator_init(&allocator);
   struct world_origin *origin = world_allocator_malloc(&allocator, sizeof(*origin));

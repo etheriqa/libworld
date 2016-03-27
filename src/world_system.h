@@ -27,3 +27,4 @@
 bool world_check_fd(int fd);
 bool world_set_nonblocking(int fd);
 bool world_set_tcp_nodelay(int fd);
+bool world_ignore_sigpipe(void);

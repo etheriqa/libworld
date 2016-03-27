@@ -23,7 +23,9 @@
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <signal.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/errno.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
@@ -64,6 +66,19 @@ bool world_set_tcp_nodelay(int fd)
       perror("setsockopt");
       return false;
     }
+  }
+
+  return true;
+}
+
+bool world_ignore_sigpipe(void)
+{
+  struct sigaction act;
+  memset(&act, 0, sizeof(act));
+  act.sa_handler = SIG_IGN;
+  if (sigaction(SIGPIPE, &act, NULL) == -1) {
+    perror("sigaction");
+    return false;
   }
 
   return true;
