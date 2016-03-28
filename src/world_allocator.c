@@ -23,19 +23,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "world_allocator.h"
+#include "world_assert.h"
 
 void world_allocator_init(struct world_allocator *a)
 {
+  WORLD_ASSERT(a);
   // do nothing for now
 }
 
 void world_allocator_destroy(struct world_allocator *a)
 {
+  WORLD_ASSERT(a);
   // do nothing for now
 }
 
 void *world_allocator_malloc(struct world_allocator *a, size_t size)
 {
+  WORLD_ASSERT(a);
   void *p = malloc(size);
   if (p == NULL) {
     perror("malloc");
@@ -46,6 +50,7 @@ void *world_allocator_malloc(struct world_allocator *a, size_t size)
 
 void *world_allocator_calloc(struct world_allocator *a, size_t count, size_t size)
 {
+  WORLD_ASSERT(a);
   void *p = calloc(count, size);
   if (p == NULL) {
     perror("calloc");
@@ -56,6 +61,7 @@ void *world_allocator_calloc(struct world_allocator *a, size_t count, size_t siz
 
 void *world_allocator_realloc(struct world_allocator *restrict a, void *restrict ptr, size_t size)
 {
+  WORLD_ASSERT(a);
   void *p = realloc(ptr, size);
   if (p == NULL) {
     perror("realloc");
@@ -66,5 +72,6 @@ void *world_allocator_realloc(struct world_allocator *restrict a, void *restrict
 
 void world_allocator_free(struct world_allocator *restrict a, void *restrict ptr)
 {
+  WORLD_ASSERT(a);
   free(ptr);
 }

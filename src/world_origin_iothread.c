@@ -41,10 +41,10 @@ static struct world_origin_iohandler **_dispatcher_get_iohandler(struct world_or
 
 void world_origin_iothread_init(struct world_origin_iothread *ot, struct world_origin *origin)
 {
-  _dispatcher_init(&ot->dispatcher, &ot->origin->allocator);
-  world_circular_init(&ot->updated, &ot->origin->allocator);
-  world_circular_init(&ot->disconnected, &ot->origin->allocator);
-  world_circular_init(&ot->asleep, &ot->origin->allocator);
+  _dispatcher_init(&ot->dispatcher, &origin->allocator);
+  world_circular_init(&ot->updated, &origin->allocator);
+  world_circular_init(&ot->disconnected, &origin->allocator);
+  world_circular_init(&ot->asleep, &origin->allocator);
 
   ot->origin = origin;
 

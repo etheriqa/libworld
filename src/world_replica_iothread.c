@@ -30,7 +30,7 @@ static void *_main(void *arg);
 
 void world_replica_iothread_init(struct world_replica_iothread *rt, struct world_replica *replica)
 {
-  world_io_multiplexer_init(&rt->multiplexer, &rt->replica->allocator);
+  world_io_multiplexer_init(&rt->multiplexer, &replica->allocator);
   world_replica_iohandler_init(&rt->handler, replica);
   world_io_multiplexer_attach(&rt->multiplexer, &rt->handler.base);
 

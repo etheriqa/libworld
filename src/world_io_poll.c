@@ -54,7 +54,7 @@ void world_io_multiplexer_attach(struct world_io_multiplexer *m, struct world_io
   if (h->fd >= world_vector_size(&m->handlers)) {
     world_vector_resize(&m->handlers, h->fd + 1, sizeof(struct world_io_handler *));
   }
-  *(struct world_io_handler **)vector_at(&m->handlers, h->fd, sizeof(h)) = h;
+  *(struct world_io_handler **)world_vector_at(&m->handlers, h->fd, sizeof(h)) = h;
 }
 
 void world_io_multiplexer_detach(struct world_io_multiplexer *m, struct world_io_handler *h)
@@ -63,7 +63,7 @@ void world_io_multiplexer_detach(struct world_io_multiplexer *m, struct world_io
   assert(h);
 
   if (h->fd < world_vector_size(&m->handlers)) {
-    *(struct world_io_handler **)vector_at(&m->handlers, h->fd, sizeof(h)) = NULL;
+    *(struct world_io_handler **)world_vector_at(&m->handlers, h->fd, sizeof(h)) = NULL;
   }
 }
 
@@ -85,7 +85,7 @@ void world_io_multiplexer_dispatch(struct world_io_multiplexer *m)
 
   int n_events;
   for (;;) {
-    n_events = poll(vector_front(&m->poll_fds), world_vector_size(&m->poll_fds), WORLD_IO_MULTIPLEX_TIMEOUT_IN_MILLISECONDS);
+    n_events = poll(world_vector_front(&m->poll_fds), world_vector_size(&m->poll_fds), WORLD_IO_MULTIPLEX_TIMEOUT_IN_MILLISECONDS);
     if (n_events != -1) {
       break;
     }
