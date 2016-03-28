@@ -11,7 +11,7 @@ addons:
       - clang-3.7
       - gcc-5
 before_script:
-  - cmake . -DCMAKE_BUILD_TYPE=release
+  - cmake . -DCMAKE_BUILD_TYPE=release -DWORLD_DISABLE_LTO=ON
   - if [ "$CC" = "clang-3.7" ]; then cmake . -DCMAKE_AR=$(which llvm-ar-3.7); fi
   - if [ "$CC" = "clang-3.7" ]; then cmake . -DCMAKE_RANLIB=$(which llvm-ranlib-3.7); fi
   - if [ "$CC" = "gcc-5" ]; then cmake . -DCMAKE_AR=$(which gcc-ar-5); fi
