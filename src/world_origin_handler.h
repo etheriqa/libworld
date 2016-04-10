@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -29,9 +29,9 @@
 #include "world_io.h"
 
 struct world_origin;
-struct world_origin_iothread;
+struct world_origin_thread;
 
-struct world_origin_iohandler {
+struct world_origin_handler {
   struct world_io_handler base;
 
   struct world_hashtable_entry *snapshot_cursor;
@@ -40,22 +40,9 @@ struct world_origin_iohandler {
   size_t offset;
 
   struct world_origin *origin;
-  struct world_origin_iothread *thread;
+  struct world_origin_thread *thread;
 };
 
-struct world_origin_iohandler *world_origin_iohandler_new(struct world_origin *origin, struct world_origin_iothread *thread, int fd);
-void world_origin_iohandler_delete(struct world_origin_iohandler *oh);
-
-static inline world_sequence world_origin_iohandler_sequence(struct world_origin_iohandler *oh)
-{
-  return atomic_load_explicit(&oh->log_cursor, memory_order_relaxed)->base.seq;
-}
-
-static inline bool world_origin_iohandler_is_updated(struct world_origin_iohandler *oh)
-{
-  struct world_hashtable_entry *lcursor = atomic_load_explicit(&oh->log_cursor, memory_order_relaxed);
-
-  return oh->offset == 0 &&
-         oh->snapshot_cursor == NULL &&
-         atomic_load_explicit(&lcursor->log, memory_order_relaxed) == NULL;
-}
+struct world_origin_handler *world_origin_handler_new(struct world_origin *origin, struct world_origin_thread *thread, int fd);
+void world_origin_handler_delete(struct world_origin_handler *oh);
+world_sequence world_origin_handler_sequence(struct world_origin_handler *oh);

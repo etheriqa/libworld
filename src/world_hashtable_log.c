@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -28,7 +28,7 @@
 
 void world_hashtable_log_init(struct world_hashtable_log *l, struct world_allocator *a)
 {
-  struct world_iovec key;
+  struct world_buffer key;
   key.base = NULL;
   key.size = 0;
   struct world_hashtable_entry *sentinel = world_hashtable_entry_new_void(a, 0, key);

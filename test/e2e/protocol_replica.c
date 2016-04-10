@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -44,7 +44,7 @@ int main(void)
   struct world_replica *replica;
   ASSERT(world_replica_open(&replica, &rc) == world_error_ok);
 
-  struct world_iovec key, data;
+  struct world_buffer key, data;
   key.base = "foo";
   key.size = strlen(key.base) + 1;
   data.base = "Lorem ipsum";
@@ -77,7 +77,7 @@ int main(void)
 
   world_test_sleep_msec(100);
 
-  struct world_iovec found;
+  struct world_buffer found;
   ASSERT(world_replica_get(replica, key, &found) == world_error_ok);
   ASSERT(found.size == data.size);
   ASSERT(memcmp(found.base, data.base, data.size) == 0);

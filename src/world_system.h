@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -27,4 +27,3 @@
 bool world_check_fd(int fd);
 bool world_set_nonblocking(int fd);
 bool world_set_tcp_nodelay(int fd);
-bool world_ignore_sigpipe(void);

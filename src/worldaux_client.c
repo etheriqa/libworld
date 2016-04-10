@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -23,6 +23,7 @@
 #include <netdb.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/errno.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <worldaux.h>
@@ -35,7 +36,7 @@ struct world_replica *worldaux_client_get_replica(struct worldaux_client *client
   return client->replica;
 }
 
-enum world_error worldaux_client_open(struct worldaux_client **c, const char *host, const char *port)
+enum world_error worldaux_client_open(struct worldaux_client **c, const char *host, const char *port, const struct world_replicaconf *conf)
 {
   struct addrinfo hint, *ai;
   memset(&hint, 0, sizeof(hint));
@@ -53,21 +54,35 @@ enum world_error worldaux_client_open(struct worldaux_client **c, const char *ho
   int fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
   if (fd == -1) {
     perror("socket");
+    freeaddrinfo(ai);
     return world_error_system;
   }
 
-  if (connect(fd, ai->ai_addr, ai->ai_addrlen) == -1) {
-    perror("connect");
-    close(fd);
-    return world_error_system;
+  for (;;) {
+    if (connect(fd, ai->ai_addr, ai->ai_addrlen) == -1) {
+      if (errno == EINTR) {
+        continue;
+      }
+      perror("connect");
+      close(fd);
+      freeaddrinfo(ai);
+      return world_error_system;
+    }
+    break;
   }
 
-  struct world_replicaconf conf;
-  world_replicaconf_init(&conf);
-  conf.fd = fd;
+  freeaddrinfo(ai);
+
+  struct world_replicaconf rc;
+  if (conf) {
+    memcpy(&rc, conf, sizeof(rc));
+  } else {
+    world_replicaconf_init(&rc);
+  }
+  rc.fd = fd;
 
   struct world_replica *replica;
-  enum world_error err = world_replica_open(&replica, &conf);
+  enum world_error err = world_replica_open(&replica, &rc);
   if (err) {
     close(fd);
     return err;

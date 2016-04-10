@@ -22,15 +22,22 @@
 
 #pragma once
 
-#include <stddef.h>
+#include <pthread.h>
+#include "world_io.h"
+#include "world_replica_handler.h"
 
-struct world_allocator {
-  void *dummy;
+struct world_replica;
+
+struct world_replica_thread {
+  struct world_io_multiplexer multiplexer;
+
+  struct world_replica_handler handler;
+
+  pthread_t thread;
+
+  struct world_replica *replica;
 };
 
-void world_allocator_init(struct world_allocator *a);
-void world_allocator_destroy(struct world_allocator *a);
-void *world_allocator_malloc(struct world_allocator *a, size_t size);
-void *world_allocator_calloc(struct world_allocator *a, size_t count, size_t size);
-void *world_allocator_realloc(struct world_allocator *restrict a, void *restrict ptr, size_t size);
-void world_allocator_free(struct world_allocator *restrict a, void *restrict ptr);
+void world_replica_thread_init(struct world_replica_thread *rt, struct world_replica *replica);
+void world_replica_thread_destroy(struct world_replica_thread *rt);
+void world_replica_thread_stop(struct world_replica_thread *rt);

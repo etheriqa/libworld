@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -66,12 +66,19 @@ void world_io_multiplexer_attach(struct world_io_multiplexer *m, struct world_io
 
   if (epoll_ctl(m->fd, EPOLL_CTL_ADD, h->fd, &event) == 0) {
     return;
+  } else if (errno == EBADF) {
+    return;
+  } else if (errno != EEXIST) {
+    goto error;
   }
 
-  if (errno == EEXIST && epoll_ctl(m->fd, EPOLL_CTL_MOD, h->fd, &event) == 0) {
+  if (epoll_ctl(m->fd, EPOLL_CTL_MOD, h->fd, &event) == 0) {
+    return;
+  } else if (errno == EBADF) {
     return;
   }
 
+error:
   perror("world_io_multiplexer: epoll_ctl");
   abort();
 }
@@ -87,7 +94,9 @@ void world_io_multiplexer_detach(struct world_io_multiplexer *m, struct world_io
   event.events |= (h->writer ? EPOLLOUT : (enum EPOLL_EVENTS)0);
   event.data.ptr = h;
 
-  if (epoll_ctl(m->fd, EPOLL_CTL_DEL, h->fd, &event) == 0 || errno == ENOENT) {
+  if (epoll_ctl(m->fd, EPOLL_CTL_DEL, h->fd, &event) == 0) {
+    return;
+  } else if (errno == ENOENT || errno == EBADF) {
     return;
   }
 
@@ -105,15 +114,22 @@ void world_io_multiplexer_dispatch(struct world_io_multiplexer *m)
       break;
     }
     if (errno == EINTR) {
-      continue;
+      return;
     }
     perror("world_io_multiplexer: epoll_wait");
     abort();
   }
 
   for (struct epoll_event *event = events; event < events + n_events; event++) {
-    // FIXME handle errors
     struct world_io_handler *handler = event->data.ptr;
+
+    if (event->events & (EPOLLERR|EPOLLHUP)) {
+      if (handler->error) {
+        handler->error(handler);
+      }
+      continue;
+    }
+
     if (event->events & EPOLLIN && handler->reader) {
       handler->reader(handler);
     }

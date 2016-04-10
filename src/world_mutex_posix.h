@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -28,7 +28,7 @@
 #include <string.h>
 
 struct world_mutex {
-  pthread_mutex_t handler;
+  pthread_mutex_t handle;
 };
 
 static inline void world_mutex_init(struct world_mutex *mtx)
@@ -47,7 +47,7 @@ static inline void world_mutex_init(struct world_mutex *mtx)
     abort();
   }
 
-  if ((err = pthread_mutex_init(&mtx->handler, &attr))) {
+  if ((err = pthread_mutex_init(&mtx->handle, &attr))) {
     fprintf(stderr, "FATAL: pthread_mutex_init: %s\n", strerror(err));
     abort();
   }
@@ -62,7 +62,7 @@ static inline void world_mutex_destroy(struct world_mutex *mtx)
 {
   int err;
 
-  if ((err = pthread_mutex_destroy(&mtx->handler))) {
+  if ((err = pthread_mutex_destroy(&mtx->handle))) {
     fprintf(stderr, "FATAL: pthread_mutex_destroy: %s\n", strerror(err));
     abort();
   }
@@ -72,7 +72,7 @@ static inline void world_mutex_lock(struct world_mutex *mtx)
 {
   int err;
 
-  if ((err = pthread_mutex_lock(&mtx->handler))) {
+  if ((err = pthread_mutex_lock(&mtx->handle))) {
     fprintf(stderr, "FATAL: pthread_mutex_lock: %s\n", strerror(err));
     abort();
   }
@@ -82,7 +82,7 @@ static inline void world_mutex_unlock(struct world_mutex *mtx)
 {
   int err;
 
-  if ((err = pthread_mutex_unlock(&mtx->handler))) {
+  if ((err = pthread_mutex_unlock(&mtx->handle))) {
     fprintf(stderr, "FATAL: pthread_mutex_unlock: %s\n", strerror(err));
     abort();
   }

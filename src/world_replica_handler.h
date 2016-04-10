@@ -23,14 +23,30 @@
 #pragma once
 
 #include <stddef.h>
+#include <world.h>
+#include "world_io.h"
 
-struct world_allocator {
-  void *dummy;
+struct world_replica_handler {
+  struct world_io_handler base;
+
+  struct {
+    world_key_size buffer;
+    size_t offset;
+  } key_size;
+
+  struct {
+    world_data_size buffer;
+    size_t offset;
+  } data_size;
+
+  struct {
+    void *buffer;
+    size_t capacity;
+    size_t offset;
+  } body;
+
+  struct world_replica *replica;
 };
 
-void world_allocator_init(struct world_allocator *a);
-void world_allocator_destroy(struct world_allocator *a);
-void *world_allocator_malloc(struct world_allocator *a, size_t size);
-void *world_allocator_calloc(struct world_allocator *a, size_t count, size_t size);
-void *world_allocator_realloc(struct world_allocator *restrict a, void *restrict ptr, size_t size);
-void world_allocator_free(struct world_allocator *restrict a, void *restrict ptr);
+void world_replica_handler_init(struct world_replica_handler *rh, struct world_replica *replica);
+void world_replica_handler_destroy(struct world_replica_handler *rh);

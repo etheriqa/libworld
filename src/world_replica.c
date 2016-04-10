@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -25,10 +25,15 @@
 #include <string.h>
 #include "world_hash.h"
 #include "world_replica.h"
+#include "world_system.h"
+
+static bool _validate_conf(const struct world_replicaconf *conf);
 
 enum world_error world_replica_open(struct world_replica **r, const struct world_replicaconf *conf)
 {
-  // TODO validate conf here
+  if (!_validate_conf(conf)) {
+    return world_error_invalid_argument;
+  }
 
   struct world_allocator allocator;
   world_allocator_init(&allocator);
@@ -37,7 +42,7 @@ enum world_error world_replica_open(struct world_replica **r, const struct world
 
   memcpy((void *)&replica->conf, conf, sizeof(replica->conf));
   world_hashtable_init(&replica->hashtable, world_generate_seed(), &replica->allocator);
-  world_replica_iothread_init(&replica->thread, replica);
+  world_replica_thread_init(&replica->thread, replica);
 
   *r = replica;
   return world_error_ok;
@@ -45,7 +50,7 @@ enum world_error world_replica_open(struct world_replica **r, const struct world
 
 enum world_error world_replica_close(struct world_replica *replica)
 {
-  world_replica_iothread_destroy(&replica->thread);
+  world_replica_thread_destroy(&replica->thread);
   world_hashtable_destroy(&replica->hashtable);
 
   struct world_allocator allocator;
@@ -56,7 +61,17 @@ enum world_error world_replica_close(struct world_replica *replica)
   return world_error_ok;
 }
 
-enum world_error world_replica_get(const struct world_replica *replica, struct world_iovec key, struct world_iovec *data)
+enum world_error world_replica_get(const struct world_replica *replica, struct world_buffer key, struct world_buffer *data)
 {
   return world_hashtable_get((struct world_hashtable *)&replica->hashtable, key, data);
+}
+
+static bool _validate_conf(const struct world_replicaconf *conf)
+{
+  if (!world_check_fd(conf->fd)) {
+    fprintf(stderr, "world_replica_open: fd: invalid value");
+    return false;
+  }
+
+  return true;
 }

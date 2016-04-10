@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -22,31 +22,35 @@
 
 #pragma once
 
-#include <stddef.h>
-#include <world.h>
+#include <pthread.h>
+#include "world_circular.h"
 #include "world_io.h"
+#include "world_mutex.h"
+#include "world_vector.h"
 
-struct world_replica_iohandler {
-  struct world_io_handler base;
+struct world_origin;
 
-  struct {
-    world_key_size buffer;
-    size_t offset;
-  } key_size;
+struct world_origin_thread {
+  struct world_origin_thread_dispatcher {
+    struct world_mutex mtx;
+    struct world_vector handlers;
+    struct world_io_multiplexer multiplexer;
+    struct world_io_interrupter interrupter;
+  } dispatcher;
 
-  struct {
-    world_data_size buffer;
-    size_t offset;
-  } data_size;
+  struct world_circular closed;
+  struct world_circular updated;
 
-  struct {
-    void *buffer;
-    size_t capacity;
-    size_t offset;
-  } body;
+  pthread_t thread;
 
-  struct world_replica *replica;
+  struct world_origin *origin;
 };
 
-void world_replica_iohandler_init(struct world_replica_iohandler *rh, struct world_replica *replica);
-void world_replica_iohandler_destroy(struct world_replica_iohandler *rh);
+void world_origin_thread_init(struct world_origin_thread *ot, struct world_origin *origin);
+void world_origin_thread_destroy(struct world_origin_thread *ot);
+void world_origin_thread_attach(struct world_origin_thread *ot, int fd);
+void world_origin_thread_detach(struct world_origin_thread *ot, int fd);
+void world_origin_thread_interrupt(struct world_origin_thread *ot);
+void world_origin_thread_notify_closed(struct world_origin_thread *ot, int fd);
+void world_origin_thread_notify_updated(struct world_origin_thread *ot, int fd);
+world_sequence world_origin_thread_least_sequence(struct world_origin_thread *ot);

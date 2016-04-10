@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -44,7 +44,7 @@ int main(void)
   ASSERT(world_origin_open(&origin, &oc) == world_error_ok);
   ASSERT(world_origin_attach(origin, fds[1]) == world_error_ok);
 
-  struct world_iovec key, data;
+  struct world_buffer key, data;
   key.base = "foo";
   key.size = strlen(key.base) + 1;
   data.base = "Lorem ipsum";

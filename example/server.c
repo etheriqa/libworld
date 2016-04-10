@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,25 +20,44 @@
  * SOFTWARE.
  */
 
-#pragma once
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/time.h>
+#include <unistd.h>
+#include <world.h>
+#include <worldaux.h>
 
-#include <pthread.h>
-#include <stdatomic.h>
-#include "world_io.h"
-#include "world_replica_iohandler.h"
+int main(int argc, char **argv)
+{
+  if (signal(SIGPIPE, SIG_IGN) == SIG_ERR) {
+    perror("signal");
+    abort();
+  }
 
-struct world_replica;
+  struct world_originconf conf;
+  world_originconf_init(&conf);
+  conf.set_tcp_nodelay = false;
 
-struct world_replica_iothread {
-  struct world_io_multiplexer multiplexer;
+  struct worldaux_server *server;
+  if (worldaux_server_open(&server, "127.0.0.1", "25200", &conf) != world_error_ok) {
+    abort();
+  }
 
-  struct world_replica_iohandler handler;
+  struct world_origin *origin = worldaux_server_get_origin(server);
 
-  pthread_t thread;
-  atomic_bool thread_loop_condition;
+  for (;;) {
+    sleep(1);
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    struct world_buffer key, data;
+    key.base = "timeval";
+    key.size = strlen(key.base) + 1;
+    data.base = &tv;
+    data.size = sizeof(tv);
+    world_origin_set(origin, key, data);
+  }
 
-  struct world_replica *replica;
-};
-
-void world_replica_iothread_init(struct world_replica_iothread *rt, struct world_replica *replica);
-void world_replica_iothread_destroy(struct world_replica_iothread *rt);
+  return 0;
+}

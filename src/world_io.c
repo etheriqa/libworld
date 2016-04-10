@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,38 +20,64 @@
  * SOFTWARE.
  */
 
-#pragma once
-
-#include <pthread.h>
-#include <stdatomic.h>
-#include "world_circular.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/errno.h>
+#include <unistd.h>
 #include "world_io.h"
-#include "world_mutex.h"
-#include "world_vector.h"
 
-struct world_origin;
+static void _interrupter_read(struct world_io_handler *h);
 
-struct world_origin_iothread {
-  struct world_origin_iothread_dispatcher {
-    struct world_mutex mtx;
-    struct world_vector handlers;
-    struct world_io_multiplexer multiplexer;
-  } dispatcher;
+void world_io_interrupter_init(struct world_io_interrupter *i)
+{
+  if (pipe(i->fds) == -1) {
+    perror("pipe");
+    abort();
+  }
+  i->handler.fd = i->fds[0];
+  i->handler.reader = _interrupter_read;
+  i->handler.writer = NULL;
+  i->handler.error = NULL;
+}
 
-  struct world_circular updated;
-  struct world_circular disconnected;
-  struct world_circular asleep;
+void world_io_interrupter_destroy(struct world_io_interrupter *i)
+{
+  for (;;) {
+    if (close(i->fds[0]) == -1) {
+      if (errno == EINTR) {
+        continue;
+      }
+      perror("close");
+      break;
+    }
+  }
+  for (;;) {
+    if (close(i->fds[1]) == -1) {
+      if (errno == EINTR) {
+        continue;
+      }
+      perror("close");
+      break;
+    }
+  }
+}
 
-  pthread_t thread;
-  atomic_bool thread_loop_condition;
+void world_io_interrupter_invoke(struct world_io_interrupter *i)
+{
+  char c = 0;
+  ssize_t n_written = write(i->fds[1], &c, 1);
+  if (n_written == -1) {
+    perror("write");
+    abort();
+  }
+}
 
-  struct world_origin *origin;
-};
-
-void world_origin_iothread_init(struct world_origin_iothread *ot, struct world_origin *origin);
-void world_origin_iothread_destroy(struct world_origin_iothread *ot);
-void world_origin_iothread_attach(struct world_origin_iothread *ot, int fd);
-void world_origin_iothread_detach(struct world_origin_iothread *ot, int fd);
-void world_origin_iothread_mark_updated(struct world_origin_iothread *ot, int fd);
-void world_origin_iothread_mark_disconnected(struct world_origin_iothread *ot, int fd);
-world_sequence world_origin_iothread_least_sequence(struct world_origin_iothread *ot);
+static void _interrupter_read(struct world_io_handler *h)
+{
+  char buf[4096];
+  ssize_t n_read = read(h->fd, buf, sizeof(buf));
+  if (n_read == -1) {
+    perror("read");
+    abort();
+  }
+}

@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -90,19 +90,26 @@ void world_io_multiplexer_dispatch(struct world_io_multiplexer *m)
       break;
     }
     if (errno == EINTR) {
-      continue;
+      return;
     }
     perror("world_io_multiplexer: poll");
     abort();
   }
 
   for (size_t i = 0; i < world_vector_size(&m->poll_fds); i++) {
-    // TODO handle errors (POLLERR, POLLHUP, POLLNVAL)
     struct pollfd *event = world_vector_at(&m->poll_fds, i, sizeof(*event));
     struct world_io_handler **handler = world_vector_at(&m->handlers, event->fd, sizeof(*handler));
     if (!handler || !*handler) {
       continue;
     }
+
+    if (event->revents & (POLLHUP|POLLERR)) {
+      if ((*handler)->error) {
+        (*handler)->error(*handler);
+      }
+      continue;
+    }
+
     if (event->revents & POLLIN && (*handler)->reader) {
       (*handler)->reader(*handler);
     }

@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -34,7 +34,7 @@ static world_key_size _data_size(struct world_hashtable_entry *entry);
 static void *_key_base(struct world_hashtable_entry *entry);
 static void *_data_base(struct world_hashtable_entry *entry);
 
-struct world_hashtable_entry *world_hashtable_entry_new(struct world_allocator *a, world_hash_type hash, struct world_iovec key, struct world_iovec data)
+struct world_hashtable_entry *world_hashtable_entry_new(struct world_allocator *a, world_hash_type hash, struct world_buffer key, struct world_buffer data)
 {
   struct world_hashtable_entry *entry = world_allocator_malloc(a, sizeof(*entry) + key.size + data.size);
 
@@ -51,7 +51,7 @@ struct world_hashtable_entry *world_hashtable_entry_new(struct world_allocator *
   return entry;
 }
 
-struct world_hashtable_entry *world_hashtable_entry_new_void(struct world_allocator *a, world_hash_type hash, struct world_iovec key)
+struct world_hashtable_entry *world_hashtable_entry_new_void(struct world_allocator *a, world_hash_type hash, struct world_buffer key)
 {
   struct world_hashtable_entry *entry = world_allocator_malloc(a, sizeof(*entry) + key.size);
 
@@ -114,28 +114,28 @@ struct world_hashtable_entry *world_hashtable_entry_advance(struct world_hashtab
   }
 }
 
-struct world_iovec world_hashtable_entry_key(struct world_hashtable_entry *entry)
+struct world_buffer world_hashtable_entry_key(struct world_hashtable_entry *entry)
 {
   WORLD_ASSERT(!world_hashtable_entry_is_bucket(entry));
-  struct world_iovec iovec;
+  struct world_buffer iovec;
   iovec.base = _key_base(entry);
   iovec.size = _key_size(entry);
   return iovec;
 }
 
-struct world_iovec world_hashtable_entry_data(struct world_hashtable_entry *entry)
+struct world_buffer world_hashtable_entry_data(struct world_hashtable_entry *entry)
 {
   WORLD_ASSERT(!world_hashtable_entry_is_bucket(entry));
-  struct world_iovec iovec;
+  struct world_buffer iovec;
   iovec.base = _data_base(entry);
   iovec.size = _data_size(entry);
   return iovec;
 }
 
-struct world_iovec world_hashtable_entry_raw(struct world_hashtable_entry *entry)
+struct world_buffer world_hashtable_entry_raw(struct world_hashtable_entry *entry)
 {
   WORLD_ASSERT(!world_hashtable_entry_is_bucket(entry));
-  struct world_iovec iovec;
+  struct world_buffer iovec;
   iovec.base = &entry->header;
   iovec.size = sizeof(entry->header) + _key_size(entry) + _data_size(entry);
   return iovec;

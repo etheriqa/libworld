@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -23,14 +23,15 @@
 #include <stdatomic.h>
 #include <string.h>
 #include "world_assert.h"
+#include "world_circular.h"
 #include "world_hashtable.h"
 #include "world_hashtable_entry.h"
 
 static float _load_factor(struct world_hashtable *ht);
-static bool _find(struct world_hashtable *ht, world_hash_type hash, struct world_iovec key, struct world_hashtable_entry **cursor);
+static bool _find(struct world_hashtable *ht, world_hash_type hash, struct world_buffer key, struct world_hashtable_entry **cursor);
 static void _append_bucket(struct world_hashtable *ht);
 static void _mark_garbage(struct world_hashtable *ht, struct world_hashtable_entry *entry);
-static void _dispose_garbage(struct world_hashtable *ht, struct world_hashtable_entry *entry);
+static void _unlink_garbage(struct world_hashtable *ht, struct world_hashtable_entry *entry);
 static bool _garbage_heap_property(const void *x, const void *y);
 
 void world_hashtable_init(struct world_hashtable *ht, world_hash_type seed, struct world_allocator *a)
@@ -46,14 +47,14 @@ void world_hashtable_init(struct world_hashtable *ht, world_hash_type seed, stru
 
 void world_hashtable_destroy(struct world_hashtable *ht)
 {
-  world_hashtable_checkpoint(ht, world_hashtable_log_greatest_sequence(&ht->log));
+  world_hashtable_checkpoint(ht, world_hashtable_log_greatest_sequence(&ht->log), NULL);
   world_vector_destroy(&ht->garbages);
   world_hashtable_log_destroy(&ht->log, ht->allocator);
   world_hashtable_bucket_destroy(&ht->bucket, ht->allocator);
   world_mutex_destroy(&ht->mtx);
 }
 
-enum world_error world_hashtable_get(struct world_hashtable *ht, struct world_iovec key, struct world_iovec *found)
+enum world_error world_hashtable_get(struct world_hashtable *ht, struct world_buffer key, struct world_buffer *found)
 {
   if (!key.base || !key.size) {
     return world_error_invalid_argument;
@@ -76,7 +77,7 @@ enum world_error world_hashtable_get(struct world_hashtable *ht, struct world_io
   }
 
   if (found) {
-    struct world_iovec data = world_hashtable_entry_data(cursor);
+    struct world_buffer data = world_hashtable_entry_data(cursor);
     found->base = data.base;
     found->size = data.size;
   }
@@ -86,7 +87,7 @@ release:
   return err;
 }
 
-enum world_error world_hashtable_set(struct world_hashtable *ht, struct world_iovec key, struct world_iovec data)
+enum world_error world_hashtable_set(struct world_hashtable *ht, struct world_buffer key, struct world_buffer data)
 {
   if (!key.base || !key.size) {
     return world_error_invalid_argument;
@@ -121,7 +122,7 @@ enum world_error world_hashtable_set(struct world_hashtable *ht, struct world_io
   return world_error_ok;
 }
 
-enum world_error world_hashtable_add(struct world_hashtable *ht, struct world_iovec key, struct world_iovec data)
+enum world_error world_hashtable_add(struct world_hashtable *ht, struct world_buffer key, struct world_buffer data)
 {
   if (!key.base || !key.size) {
     return world_error_invalid_argument;
@@ -161,7 +162,7 @@ release:
   return err;
 }
 
-enum world_error world_hashtable_replace(struct world_hashtable *ht, struct world_iovec key, struct world_iovec data)
+enum world_error world_hashtable_replace(struct world_hashtable *ht, struct world_buffer key, struct world_buffer data)
 {
   if (!key.base || !key.size) {
     return world_error_invalid_argument;
@@ -194,7 +195,7 @@ release:
   return err;
 }
 
-enum world_error world_hashtable_delete(struct world_hashtable *ht, struct world_iovec key)
+enum world_error world_hashtable_delete(struct world_hashtable *ht, struct world_buffer key)
 {
   if (!key.base || !key.size) {
     return world_error_invalid_argument;
@@ -239,7 +240,7 @@ struct world_hashtable_entry *world_hashtable_log(struct world_hashtable *ht)
   return world_hashtable_log_back(&ht->log);
 }
 
-void world_hashtable_checkpoint(struct world_hashtable *ht, world_sequence seq)
+void world_hashtable_checkpoint(struct world_hashtable *ht, world_sequence seq, struct world_circular *garbages)
 {
   world_mutex_lock(&ht->mtx);
 
@@ -252,7 +253,12 @@ void world_hashtable_checkpoint(struct world_hashtable *ht, world_sequence seq)
     if ((*position)->base.seq >= world_hashtable_log_least_sequence(&ht->log)) {
       break;
     }
-    _dispose_garbage(ht, *position);
+    _unlink_garbage(ht, *position);
+    if (garbages) {
+      world_circular_push_back(garbages, position, sizeof(*position));
+    } else {
+      world_hashtable_entry_delete(*position, ht->allocator);
+    }
     world_vector_pop_heap(&ht->garbages, sizeof(*position), _garbage_heap_property);
   }
 
@@ -264,7 +270,7 @@ static float _load_factor(struct world_hashtable *ht)
   return (float)ht->n_fresh_entries / world_hashtable_bucket_size(&ht->bucket);
 }
 
-static bool _find(struct world_hashtable *ht, world_hash_type hash, struct world_iovec key, struct world_hashtable_entry **cursor)
+static bool _find(struct world_hashtable *ht, world_hash_type hash, struct world_buffer key, struct world_hashtable_entry **cursor)
 {
   *cursor = world_hashtable_bucket_find(&ht->bucket, hash);
   for (;;) {
@@ -273,7 +279,7 @@ static bool _find(struct world_hashtable *ht, world_hash_type hash, struct world
       return false;
     }
     if (next->base.hash == hash) {
-      struct world_iovec k = world_hashtable_entry_key(next);
+      struct world_buffer k = world_hashtable_entry_key(next);
       if (k.size == key.size && memcmp(key.base, k.base, k.size) == 0) {
         return true;
       }
@@ -294,10 +300,10 @@ static void _mark_garbage(struct world_hashtable *ht, struct world_hashtable_ent
   world_vector_push_heap(&ht->garbages, &entry, sizeof(entry),_garbage_heap_property);
 }
 
-static void _dispose_garbage(struct world_hashtable *ht, struct world_hashtable_entry *entry)
+static void _unlink_garbage(struct world_hashtable *ht, struct world_hashtable_entry *entry)
 {
   // We know what to be removed from the hashtable, so we use an optimized way,
-  // instead of _find(), to find a entry to be disposed.
+  // instead of _find(), to find an entry to be unlinked.
   struct world_hashtable_entry *cursor = world_hashtable_bucket_find(&ht->bucket, entry->base.hash);
   for (;;) {
     // Check a next entry
@@ -306,7 +312,7 @@ static void _dispose_garbage(struct world_hashtable *ht, struct world_hashtable_
       WORLD_ASSERT(next->stale == NULL);
       struct world_hashtable_entry *nextnext = atomic_load_explicit(&next->base.next, memory_order_relaxed);
       atomic_store_explicit(&cursor->base.next, nextnext, memory_order_release);
-      goto found;
+      return;
     }
     cursor = next;
 
@@ -319,7 +325,7 @@ static void _dispose_garbage(struct world_hashtable *ht, struct world_hashtable_
     if (stale == entry) {
       WORLD_ASSERT(stale->stale == NULL);
       atomic_store_explicit(&cursor->stale, NULL, memory_order_release);
-      goto found;
+      return;
     }
 
     if (stale == NULL || cursor->base.hash != entry->base.hash) {
@@ -335,14 +341,11 @@ static void _dispose_garbage(struct world_hashtable *ht, struct world_hashtable_
       if (stalestale == entry) {
         WORLD_ASSERT(stalestale->stale == NULL);
         atomic_store_explicit(&stale->stale, NULL, memory_order_relaxed);
-        goto found;
+        return;
       }
       stale = stalestale;
     }
   }
-
-found:
-  world_hashtable_entry_delete(entry, ht->allocator);
 }
 
 static bool _garbage_heap_property(const void *x, const void *y)

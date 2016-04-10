@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -27,13 +27,13 @@
 int main(void)
 {
   struct worldaux_server *server;
-  ASSERT(worldaux_server_open(&server, "127.0.0.1", "25200") == world_error_ok);
+  ASSERT(worldaux_server_open(&server, "127.0.0.1", "25200", NULL) == world_error_ok);
 
   struct worldaux_client *client;
-  ASSERT(worldaux_client_open(&client, "127.0.0.1", "25200") == world_error_ok);
+  ASSERT(worldaux_client_open(&client, "127.0.0.1", "25200", NULL) == world_error_ok);
 
   struct world_origin *origin = worldaux_server_get_origin(server);
-  struct world_iovec key, data;
+  struct world_buffer key, data;
   key.base = "foo";
   key.size = strlen(key.base) + 1;
   data.base = "Lorem ipsum";
@@ -43,7 +43,7 @@ int main(void)
   world_test_sleep_msec(100);
 
   struct world_replica *replica = worldaux_client_get_replica(client);
-  struct world_iovec found;
+  struct world_buffer found;
   ASSERT(world_replica_get(replica, key, &found) == world_error_ok);
   ASSERT(data.size == found.size);
   ASSERT(memcmp(data.base, found.base, found.size) == 0);

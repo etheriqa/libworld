@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -39,7 +39,7 @@ typedef bool world_vector_heap_property(const void *, const void *);
 void world_vector_init(struct world_vector *v, struct world_allocator *a);
 void world_vector_destroy(struct world_vector *v);
 size_t world_vector_size(struct world_vector *v);
-void world_vector_resize(struct world_vector *v, size_t capacity, size_t size);
+/* FIXME */ void world_vector_resize(struct world_vector *v, size_t capacity, size_t size);
 void world_vector_reserve(struct world_vector *v, size_t capacity, size_t size);
 void *world_vector_at(struct world_vector *v, size_t i, size_t size);
 void *world_vector_front(struct world_vector *v);

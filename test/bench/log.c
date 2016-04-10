@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -175,7 +175,7 @@ int main(int argc, char **argv)
   size_t watermark = 1024;
 
   {
-    char c;
+    int c;
     while ((c = getopt(argc, argv, "cdkprstw")) != -1) {
       switch (c) {
       case 'c':
@@ -344,7 +344,7 @@ int main(int argc, char **argv)
     if (gseq - lseq >= watermark) {
       world_test_sleep_msec(1);
     }
-    struct world_iovec key, data;
+    struct world_buffer key, data;
     key.base = (void *)((uintptr_t)key_buf + (i % cardinality) * key_size);
     key.size = key_size;
     data.base = data_buf;

@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,42 +24,53 @@
 #include <stdlib.h>
 #include <string.h>
 #include "world_replica.h"
-#include "world_replica_iothread.h"
+#include "world_replica_thread.h"
 
-static void *_main(void *arg);
+static void *_replica_main(void *arg);
 
-void world_replica_iothread_init(struct world_replica_iothread *rt, struct world_replica *replica)
+void world_replica_thread_init(struct world_replica_thread *rt, struct world_replica *replica)
 {
   world_io_multiplexer_init(&rt->multiplexer, &replica->allocator);
-  world_replica_iohandler_init(&rt->handler, replica);
+  world_replica_handler_init(&rt->handler, replica);
   world_io_multiplexer_attach(&rt->multiplexer, &rt->handler.base);
 
   rt->replica = replica;
 
-  rt->thread_loop_condition = true;
-  int err = pthread_create(&rt->thread, NULL, _main, rt);
+  int err = pthread_create(&rt->thread, NULL, _replica_main, rt);
   if (err) {
     fprintf(stderr, "pthread_create: %s\n", strerror(err));
     abort();
   }
 }
 
-void world_replica_iothread_destroy(struct world_replica_iothread *rt)
+void world_replica_thread_destroy(struct world_replica_thread *rt)
 {
-  rt->thread_loop_condition = false;
+  world_replica_thread_stop(rt);
   int err = pthread_join(rt->thread, NULL);
   if (err) {
     fprintf(stderr, "pthread_join: %s\n", strerror(err));
   }
 
   world_io_multiplexer_destroy(&rt->multiplexer);
-  world_replica_iohandler_destroy(&rt->handler);
+  world_replica_handler_destroy(&rt->handler);
 }
 
-static void *_main(void *arg)
+void world_replica_thread_stop(struct world_replica_thread *rt)
 {
-  struct world_replica_iothread *rt = arg;
-  while (rt->thread_loop_condition) {
+  int err = pthread_cancel(rt->thread);
+  if (err) {
+    fprintf(stderr, "pthread_cancel: %s\n", strerror(err));
+  }
+}
+
+static void *_replica_main(void *arg)
+{
+  struct world_replica_thread *rt = arg;
+  for (;;) {
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+    pthread_testcancel();
+    pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+
     world_io_multiplexer_dispatch(&rt->multiplexer);
   }
   return NULL;

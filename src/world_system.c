@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -23,7 +23,6 @@
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#include <signal.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/errno.h>
@@ -66,19 +65,6 @@ bool world_set_tcp_nodelay(int fd)
       perror("setsockopt");
       return false;
     }
-  }
-
-  return true;
-}
-
-bool world_ignore_sigpipe(void)
-{
-  struct sigaction act;
-  memset(&act, 0, sizeof(act));
-  act.sa_handler = SIG_IGN;
-  if (sigaction(SIGPIPE, &act, NULL) == -1) {
-    perror("sigaction");
-    return false;
   }
 
   return true;

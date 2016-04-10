@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -96,22 +96,29 @@ void world_io_multiplexer_dispatch(struct world_io_multiplexer *m)
       break;
     }
     if (errno == EINTR) {
-      continue;
+      return;
     }
     perror("world_io_multiplexer: select");
     abort();
   }
 
   for (size_t i = 0; i < FD_SETSIZE; i++) {
-    // TODO handle errors
     struct world_io_handler **handler = world_vector_at(&m->handlers, i, sizeof(*handler));
     if (!handler || !*handler) {
       continue;
     }
-    if (n_events != -1 && FD_ISSET(i, &m->read_fds) && (*handler)->reader) {
+
+    if (FD_ISSET(i, &m->error_fds)) {
+      if ((*handler)->error) {
+        (*handler)->error(*handler);
+      }
+      continue;
+    }
+
+    if (FD_ISSET(i, &m->read_fds) && (*handler)->reader) {
       (*handler)->reader(*handler);
     }
-    if (n_events != -1 && FD_ISSET(i, &m->write_fds) && (*handler)->writer) {
+    if (FD_ISSET(i, &m->write_fds) && (*handler)->writer) {
       (*handler)->writer(*handler);
     }
   }

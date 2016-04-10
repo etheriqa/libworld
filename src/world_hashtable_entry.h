@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -42,13 +42,13 @@ struct world_hashtable_entry {
   } header;
 };
 
-struct world_hashtable_entry *world_hashtable_entry_new(struct world_allocator *a, world_hash_type hash, struct world_iovec key, struct world_iovec data);
-struct world_hashtable_entry *world_hashtable_entry_new_void(struct world_allocator *a, world_hash_type hash, struct world_iovec key);
+struct world_hashtable_entry *world_hashtable_entry_new(struct world_allocator *a, world_hash_type hash, struct world_buffer key, struct world_buffer data);
+struct world_hashtable_entry *world_hashtable_entry_new_void(struct world_allocator *a, world_hash_type hash, struct world_buffer key);
 struct world_hashtable_entry *world_hashtable_entry_new_bucket(struct world_allocator *a, world_hash_type hash);
 void world_hashtable_entry_delete(struct world_hashtable_entry *entry, struct world_allocator *a);
 bool world_hashtable_entry_is_void(struct world_hashtable_entry *entry);
 bool world_hashtable_entry_is_bucket(struct world_hashtable_entry *entry);
 struct world_hashtable_entry *world_hashtable_entry_advance(struct world_hashtable_entry **entry, world_sequence seq);
-struct world_iovec world_hashtable_entry_key(struct world_hashtable_entry *entry);
-struct world_iovec world_hashtable_entry_data(struct world_hashtable_entry *entry);
-struct world_iovec world_hashtable_entry_raw(struct world_hashtable_entry *entry);
+struct world_buffer world_hashtable_entry_key(struct world_hashtable_entry *entry);
+struct world_buffer world_hashtable_entry_data(struct world_hashtable_entry *entry);
+struct world_buffer world_hashtable_entry_raw(struct world_hashtable_entry *entry);

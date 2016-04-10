@@ -1,7 +1,9 @@
 language: c
+os:
+  - linux
 compiler:
-  - clang-3.7
-  - gcc-5
+  - clang
+  - gcc
 addons:
   apt:
     sources:
@@ -10,13 +12,13 @@ addons:
     packages:
       - clang-3.7
       - gcc-5
+env:
+  - IO_MULTIPLEXER=select
+  - IO_MULTIPLEXER=poll
+  - IO_MULTIPLEXER=epoll
 before_script:
-  - cmake . -DCMAKE_BUILD_TYPE=release -DWORLD_DISABLE_LTO=ON
-  - if [ "$CC" = "clang-3.7" ]; then cmake . -DCMAKE_AR=$(which llvm-ar-3.7); fi
-  - if [ "$CC" = "clang-3.7" ]; then cmake . -DCMAKE_RANLIB=$(which llvm-ranlib-3.7); fi
-  - if [ "$CC" = "gcc-5" ]; then cmake . -DCMAKE_AR=$(which gcc-ar-5); fi
-  - if [ "$CC" = "gcc-5" ]; then cmake . -DCMAKE_RANLIB=$(which gcc-ranlib-5); fi
+  - if [ "$CC" = "clang" ]; then cmake . -DCMAKE_C_COMPILER=$(which clang-3.7); fi
+  - if [ "$CC" = "gcc" ]; then cmake . -DCMAKE_C_COMPILER=$(which gcc-5); fi
+  - cmake . -DCMAKE_BUILD_TYPE=release
 script:
-  - cmake . -DWORLD_IO_MULTIPLEX_METHOD=select && make && ctest --output-on-failure
-  - cmake . -DWORLD_IO_MULTIPLEX_METHOD=poll   && make && ctest --output-on-failure
-  - cmake . -DWORLD_IO_MULTIPLEX_METHOD=epoll  && make && ctest --output-on-failure
+  - cmake . -DWORLD_IO_MULTIPLEXER=${IO_MULTIPLEXER} && make && ctest --output-on-failure

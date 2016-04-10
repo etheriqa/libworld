@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,27 +20,29 @@
  * SOFTWARE.
  */
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/errno.h>
 #include <sys/uio.h>
+#include <unistd.h>
+#include "world_assert.h"
 #include "world_origin.h"
-#include "world_origin_iohandler.h"
-#include "world_origin_iothread.h"
+#include "world_origin_handler.h"
+#include "world_origin_thread.h"
 
-static void _write(struct world_io_handler *h);
-static void _fill_iovec(struct world_origin_iohandler *oh, struct iovec *iovecs, size_t n_iovecs);
-static void _drain_iovec(struct world_origin_iohandler *oh, struct iovec *iovecs, size_t n_iovecs, size_t n_written);
+static void _origin_io_writer(struct world_io_handler *h);
+static void _origin_io_error(struct world_io_handler *h);
+static void _fill_iovec(struct world_origin_handler *oh, struct iovec *iovecs, size_t n_iovecs);
+static void _drain_iovec(struct world_origin_handler *oh, struct iovec *iovecs, size_t n_iovecs, size_t n_written);
 
-struct world_origin_iohandler *world_origin_iohandler_new(struct world_origin *origin, struct world_origin_iothread *thread, int fd)
+struct world_origin_handler *world_origin_handler_new(struct world_origin *origin, struct world_origin_thread *thread, int fd)
 {
-  struct world_origin_iohandler *oh = world_allocator_malloc(&origin->allocator, sizeof(*oh));
+  struct world_origin_handler *oh = world_allocator_malloc(&origin->allocator, sizeof(*oh));
 
   oh->base.fd = fd;
   oh->base.reader = NULL;
-  oh->base.writer = _write;
-  oh->base.error = NULL; // TODO
+  oh->base.writer = _origin_io_writer;
+  oh->base.error = _origin_io_error;
   oh->snapshot_cursor = world_hashtable_front(&origin->hashtable);
   oh->log_cursor = world_hashtable_log(&origin->hashtable);
   oh->offset = 0;
@@ -50,53 +52,67 @@ struct world_origin_iohandler *world_origin_iohandler_new(struct world_origin *o
   return oh;
 }
 
-void world_origin_iohandler_delete(struct world_origin_iohandler *oh)
+void world_origin_handler_delete(struct world_origin_handler *oh)
 {
   world_allocator_free(&oh->origin->allocator, oh);
 }
 
-static void _write(struct world_io_handler *h)
+world_sequence world_origin_handler_sequence(struct world_origin_handler *oh)
 {
-  struct world_origin_iohandler *oh = (struct world_origin_iohandler *)h;
+  return atomic_load_explicit(&oh->log_cursor, memory_order_relaxed)->base.seq;
+}
 
-  if (world_origin_iohandler_is_updated(oh)) {
-    world_origin_iothread_mark_updated(oh->thread, oh->base.fd);
-    return;
-  }
+static void _origin_io_writer(struct world_io_handler *h)
+{
+  struct world_origin_handler *oh = (struct world_origin_handler *)h;
 
-  const size_t n_iovecs = 64;
+  const size_t n_iovecs = 256;
 
   struct iovec iovecs[n_iovecs];
   _fill_iovec(oh, iovecs, n_iovecs);
   if (iovecs[0].iov_len == 0) {
+    world_origin_thread_notify_updated(oh->thread, oh->base.fd);
     return;
   }
 
   ssize_t n_written = writev(oh->base.fd, iovecs, n_iovecs);
+  if (n_written == 0) {
+    // TODO
+  }
   if (n_written == -1) {
-    if (errno == EAGAIN) {
+    if (errno == EINTR || errno == EAGAIN) {
       return;
+    } else if (errno == EPIPE || errno == ECONNRESET) {
+      // suppress a report
+    } else {
+      perror("writev");
     }
-    if (errno == EPIPE) {
-      world_origin_iothread_mark_disconnected(oh->thread, oh->base.fd);
-      return;
-    }
-    // TODO handle errors
-    perror("writev");
-    abort();
+    _origin_io_error(&oh->base);
+    return;
   }
 
   _drain_iovec(oh, iovecs, n_iovecs, n_written);
 }
 
-static void _fill_iovec(struct world_origin_iohandler *oh, struct iovec *iovecs, size_t n_iovecs)
+static void _origin_io_error(struct world_io_handler *h)
+{
+  struct world_origin_handler *oh = (struct world_origin_handler *)h;
+
+  if (close(oh->base.fd) == -1) {
+    perror("close");
+  }
+
+  world_origin_thread_notify_closed(oh->thread, oh->base.fd);
+}
+
+static void _fill_iovec(struct world_origin_handler *oh, struct iovec *iovecs, size_t n_iovecs)
 {
   memset(iovecs, 0, sizeof(struct iovec) * n_iovecs);
 
   struct world_hashtable_entry *scursor = oh->snapshot_cursor;
   struct world_hashtable_entry *lcursor = oh->log_cursor;
   for (size_t i = 0; i < n_iovecs; i++) {
-    struct world_iovec iovec;
+    struct world_buffer iovec;
     if (scursor) {
       struct world_hashtable_entry *entry = world_hashtable_entry_advance(&scursor, lcursor->base.seq);
       if (entry) {
@@ -115,12 +131,12 @@ static void _fill_iovec(struct world_origin_iohandler *oh, struct iovec *iovecs,
     iovecs[i].iov_len = iovec.size;
   }
 
-  assert(iovecs[0].iov_len >= oh->offset);
+  WORLD_ASSERT(iovecs[0].iov_len >= oh->offset);
   iovecs[0].iov_base = (char *)((uintptr_t)iovecs[0].iov_base + oh->offset);
   iovecs[0].iov_len -= oh->offset;
 }
 
-static void _drain_iovec(struct world_origin_iohandler *oh, struct iovec *iovecs, size_t n_iovecs, size_t n_written)
+static void _drain_iovec(struct world_origin_handler *oh, struct iovec *iovecs, size_t n_iovecs, size_t n_written)
 {
   for (size_t i = 0; i < n_iovecs; i++) {
     if (iovecs[i].iov_len == 0) {
@@ -141,6 +157,6 @@ static void _drain_iovec(struct world_origin_iohandler *oh, struct iovec *iovecs
       continue;
     }
     atomic_store_explicit(&oh->log_cursor, atomic_load_explicit(&lcursor->log, memory_order_relaxed), memory_order_relaxed);
-    assert(oh->log_cursor);
+    WORLD_ASSERT(oh->log_cursor);
   }
 }

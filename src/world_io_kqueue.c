@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -87,7 +87,11 @@ void world_io_multiplexer_detach(struct world_io_multiplexer *m, struct world_io
   event.flags = EV_DELETE;
   event.udata = h;
 
-  if (kevent(m->fd, &event, 1, NULL, 0, NULL) != -1 || errno == ENOENT) {
+  if (kevent(m->fd, &event, 1, NULL, 0, NULL) != -1) {
+    return;
+  }
+
+  if (errno == ENOENT || errno == EBADF) {
     return;
   }
 
@@ -108,15 +112,22 @@ void world_io_multiplexer_dispatch(struct world_io_multiplexer *m)
       break;
     }
     if (errno == EINTR) {
-      continue;
+      return;
     }
     perror("world_io_multiplexer: kevent");
     abort();
   }
 
   for (struct kevent *event = events; event < events + n_events; event++) {
-    // TODO handle errors
     struct world_io_handler *handler = event->udata;
+
+    if (event->flags & (EV_EOF|EV_ERROR)) {
+      if (handler->error) {
+        handler->error(handler);
+      }
+      continue;
+    }
+
     if (event->filter == EVFILT_READ && handler->reader) {
       handler->reader(handler);
     }

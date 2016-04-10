@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -31,6 +31,7 @@
 #include "world_vector.h"
 
 struct world_allocator;
+struct world_circular;
 struct world_hashtable_entry;
 
 struct world_hashtable {
@@ -45,11 +46,11 @@ struct world_hashtable {
 
 void world_hashtable_init(struct world_hashtable *ht, world_hash_type seed, struct world_allocator *a);
 void world_hashtable_destroy(struct world_hashtable *ht);
-enum world_error world_hashtable_get(struct world_hashtable *ht, struct world_iovec key, struct world_iovec *found);
-enum world_error world_hashtable_set(struct world_hashtable *ht, struct world_iovec key, struct world_iovec data);
-enum world_error world_hashtable_add(struct world_hashtable *ht, struct world_iovec key, struct world_iovec data);
-enum world_error world_hashtable_replace(struct world_hashtable *ht, struct world_iovec key, struct world_iovec data);
-enum world_error world_hashtable_delete(struct world_hashtable *ht, struct world_iovec key);
+enum world_error world_hashtable_get(struct world_hashtable *ht, struct world_buffer key, struct world_buffer *found);
+enum world_error world_hashtable_set(struct world_hashtable *ht, struct world_buffer key, struct world_buffer data);
+enum world_error world_hashtable_add(struct world_hashtable *ht, struct world_buffer key, struct world_buffer data);
+enum world_error world_hashtable_replace(struct world_hashtable *ht, struct world_buffer key, struct world_buffer data);
+enum world_error world_hashtable_delete(struct world_hashtable *ht, struct world_buffer key);
 struct world_hashtable_entry *world_hashtable_front(struct world_hashtable *ht);
 struct world_hashtable_entry *world_hashtable_log(struct world_hashtable *ht);
-void world_hashtable_checkpoint(struct world_hashtable *ht, world_sequence seq);
+void world_hashtable_checkpoint(struct world_hashtable *ht, world_sequence seq, struct world_circular *garbages);

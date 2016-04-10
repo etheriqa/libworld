@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -23,6 +23,7 @@
 #include <netdb.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/errno.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <worldaux.h>
@@ -37,7 +38,7 @@ struct world_origin *worldaux_server_get_origin(struct worldaux_server *server)
   return server->origin;
 }
 
-enum world_error worldaux_server_open(struct worldaux_server **s, const char *host, const char *port)
+enum world_error worldaux_server_open(struct worldaux_server **s, const char *host, const char *port, const struct world_originconf *conf)
 {
   struct addrinfo hint, *ai;
   memset(&hint, 0, sizeof(hint));
@@ -55,6 +56,7 @@ enum world_error worldaux_server_open(struct worldaux_server **s, const char *ho
   int fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
   if (fd == -1) {
     perror("socket");
+    freeaddrinfo(ai);
     return world_error_system;
   }
 
@@ -69,8 +71,11 @@ enum world_error worldaux_server_open(struct worldaux_server **s, const char *ho
   if (bind(fd, ai->ai_addr, ai->ai_addrlen) == -1) {
     perror("bind");
     close(fd);
+    freeaddrinfo(ai);
     return world_error_system;
   }
+
+  freeaddrinfo(ai);
 
   if (listen(fd, 16) == -1) {
     perror("listen");
@@ -78,11 +83,15 @@ enum world_error worldaux_server_open(struct worldaux_server **s, const char *ho
     return world_error_system;
   }
 
-  struct world_originconf conf;
-  world_originconf_init(&conf);
+  struct world_originconf oc;
+  if (conf) {
+    memcpy(&oc, conf, sizeof(oc));
+  } else {
+    world_originconf_init(&oc);
+  }
 
   struct world_origin *origin;
-  enum world_error err = world_origin_open(&origin, &conf);
+  enum world_error err = world_origin_open(&origin, &oc);
   if (err) {
     close(fd);
     return err;
@@ -125,6 +134,9 @@ static void *_accept_main(void *arg)
   for (;;) {
     int fd = accept(server->fd, NULL, NULL);
     if (fd == -1) {
+      if (errno == EINTR) {
+        continue;
+      }
       perror("accept");
       continue;
     }

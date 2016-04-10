@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -25,11 +25,11 @@
 #include <world.h>
 #include "world_allocator.h"
 #include "world_hashtable.h"
-#include "world_replica_iothread.h"
+#include "world_replica_thread.h"
 
 struct world_replica {
   struct world_allocator allocator;
   const struct world_replicaconf conf;
   struct world_hashtable hashtable;
-  struct world_replica_iothread thread;
+  struct world_replica_thread thread;
 };

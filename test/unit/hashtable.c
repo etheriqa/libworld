@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -33,7 +33,7 @@ static void test_hashtable_manipulation(void)
   struct world_hashtable ht;
   world_hashtable_init(&ht, 0, &allocator);
 
-  struct world_iovec key, data, found;
+  struct world_buffer key, data, found;
 
   key.base = "foo";
   key.size = strlen(key.base) + 1;

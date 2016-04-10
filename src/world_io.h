@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2016 TAKAMORI Kaede <etheriqa@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -26,22 +26,30 @@
 
 #define WORLD_IO_MULTIPLEX_TIMEOUT_IN_MILLISECONDS 10
 
+struct world_io_handler {
+  unsigned int fd;
+  void (*reader)(struct world_io_handler *h);
+  void (*writer)(struct world_io_handler *h);
+  void (*error)(struct world_io_handler *h);
+};
+
+struct world_io_interrupter {
+  struct world_io_handler handler;
+  int fds[2];
+};
+
 struct world_allocator;
-struct world_io_handler;
 struct world_io_multiplexer;
+
+void world_io_interrupter_init(struct world_io_interrupter *i);
+void world_io_interrupter_destroy(struct world_io_interrupter *i);
+void world_io_interrupter_invoke(struct world_io_interrupter *i);
 
 void world_io_multiplexer_init(struct world_io_multiplexer *m, struct world_allocator *a);
 void world_io_multiplexer_destroy(struct world_io_multiplexer *m);
 void world_io_multiplexer_attach(struct world_io_multiplexer *m, struct world_io_handler *h);
 void world_io_multiplexer_detach(struct world_io_multiplexer *m, struct world_io_handler *h);
 void world_io_multiplexer_dispatch(struct world_io_multiplexer *m);
-
-struct world_io_handler {
-  uint32_t fd;
-  void (*reader)(struct world_io_handler *h);
-  void (*writer)(struct world_io_handler *h);
-  void (*error)(struct world_io_handler *h); // TODO implement
-};
 
 #if defined(WORLD_USE_SELECT)
 #include "world_io_select.h"
